@@ -1,10 +1,6 @@
 import { google } from 'googleapis'
 import { OAuth2Client } from 'google-auth-library'
-import fs from 'fs'
-import path from 'path'
 import type { InvoiceRow, PaymentRow, CanvasRunRow, CanvasItemRow } from './types'
-
-const TOKEN_PATH = path.join(process.cwd(), 'token.json')
 
 const SHEET_ID_AR_INVOICES = process.env.GOOGLE_SHEET_ID_AR_INVOICES!
 const SHEET_ID_AR_PAYMENTS = process.env.GOOGLE_SHEET_ID_AR_PAYMENTS!
@@ -16,49 +12,20 @@ const TAB_AR_PAYMENTS = process.env.GOOGLE_TAB_AR_PAYMENTS ?? 'Sheet1'
 const TAB_CANVAS_RUNS = process.env.GOOGLE_TAB_CANVAS_RUNS ?? 'Sheet1'
 const TAB_CANVAS_ITEMS = process.env.GOOGLE_TAB_CANVAS_ITEMS ?? 'Sheet1'
 
-interface PythonToken {
-  token: string
-  refresh_token: string
-  token_uri: string
-  client_id: string
-  client_secret: string
-  scopes: string[]
-  universe_domain: string
-  account: string
-  expiry: string
-}
-
 // Singleton with dev-mode global to survive hot reload
 const globalForSheets = global as typeof global & { oauth2Client?: OAuth2Client }
 
 function getOAuth2Client(): OAuth2Client {
   if (globalForSheets.oauth2Client) return globalForSheets.oauth2Client
 
-  const pyToken: PythonToken = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'))
-
   const client = new google.auth.OAuth2(
-    pyToken.client_id,
-    pyToken.client_secret,
-    pyToken.token_uri
+    process.env.GOOGLE_CLIENT_ID!,
+    process.env.GOOGLE_CLIENT_SECRET!,
+    'https://oauth2.googleapis.com/token'
   )
 
   client.setCredentials({
-    access_token: pyToken.token,
-    refresh_token: pyToken.refresh_token,
-    expiry_date: new Date(pyToken.expiry).getTime(),
-    token_type: 'Bearer',
-  })
-
-  client.on('tokens', (newTokens) => {
-    const current: PythonToken = JSON.parse(fs.readFileSync(TOKEN_PATH, 'utf-8'))
-    const updated: PythonToken = {
-      ...current,
-      token: newTokens.access_token ?? current.token,
-      expiry: newTokens.expiry_date
-        ? new Date(newTokens.expiry_date).toISOString()
-        : current.expiry,
-    }
-    fs.writeFileSync(TOKEN_PATH, JSON.stringify(updated, null, 2), 'utf-8')
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN!,
   })
 
   if (process.env.NODE_ENV !== 'production') {
