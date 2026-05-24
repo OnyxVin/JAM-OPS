@@ -56,8 +56,11 @@ async function getSheetValues(spreadsheetId: string, tabName: string): Promise<s
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
     range: tabName,
+    valueRenderOption: 'UNFORMATTED_VALUE',
   })
-  return (response.data.values ?? []) as string[][]
+  return (response.data.values ?? []).map(row =>
+    row.map((cell: unknown) => (cell == null ? '' : String(cell)))
+  ) as string[][]
 }
 
 async function appendRow(
