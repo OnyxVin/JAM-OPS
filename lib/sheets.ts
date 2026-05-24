@@ -39,6 +39,21 @@ function getSheetsAPI() {
   return google.sheets({ version: 'v4', auth: getOAuth2Client() })
 }
 
+// ─── Date normalization (handles Google Sheets serial numbers) ────────────────
+
+function normalizeDate(value: string): string {
+  if (!value) return ''
+  const num = Number(value)
+  if (!isNaN(num) && num > 1000) {
+    const date = new Date(Date.UTC(1899, 11, 30) + num * 86400000)
+    const d = String(date.getUTCDate()).padStart(2, '0')
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const y = date.getUTCFullYear()
+    return `${d}/${m}/${y}`
+  }
+  return value
+}
+
 // ─── Header-driven column map ─────────────────────────────────────────────────
 
 function buildColumnMap(headers: string[]): Record<string, number> {
@@ -101,8 +116,8 @@ export async function getAllInvoices(): Promise<InvoiceRow[]> {
   const colMap = buildColumnMap(rows[0])
   return rows.slice(1).map((row, index) => ({
     invoiceCode:  row[colMap['invoice code']]   ?? '',
-    invoiceDate:  row[colMap['invoice date']]   ?? '',
-    dueDate:      row[colMap['due date']]       ?? '',
+    invoiceDate:  normalizeDate(row[colMap['invoice date']]   ?? ''),
+    dueDate:      normalizeDate(row[colMap['due date']]       ?? ''),
     customerName: row[colMap['customer name']]  ?? '',
     address:      row[colMap['address']]        ?? '',
     discount:     row[colMap['discount']]       ?? '0',
@@ -252,8 +267,8 @@ export async function getAllCanvasRuns(): Promise<CanvasRunRow[]> {
   return rows.slice(1).map((row, index) => ({
     canvasId:     row[0] ?? '',
     salesRepName: row[1] ?? '',
-    dateOut:      row[2] ?? '',
-    dateClosed:   row[3] ?? '',
+    dateOut:      normalizeDate(row[2] ?? ''),
+    dateClosed:   normalizeDate(row[3] ?? ''),
     status:       (row[4] ?? 'Open') as 'Open' | 'Closed',
     rowIndex:     index + 2,
   })).filter(r => r.canvasId !== '')
