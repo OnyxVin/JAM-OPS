@@ -615,6 +615,27 @@ export default function ReceivablesPage() {
   const activeFilterCount = filterStatuses.size + (filterInvoiceMonth ? 1 : 0) + (filterDueMonth ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0 || searchText.trim() !== ''
 
+  // ─── Sort state ───────────────────────────────────────────────────────────
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(col: string) {
+    if (sortColumn === col) {
+      if (sortDirection === 'asc') setSortDirection('desc')
+      else { setSortColumn(null); setSortDirection('asc') }
+    } else {
+      setSortColumn(col)
+      setSortDirection('asc')
+    }
+  }
+
+  function sortIcon(col: string) {
+    if (sortColumn !== col) return <span className="ml-1 text-gray-300">⇅</span>
+    return sortDirection === 'asc'
+      ? <span className="ml-1 text-blue-500">↑</span>
+      : <span className="ml-1 text-blue-500">↓</span>
+  }
+
   function resetAll() {
     setSearchText('')
     setSearchScope('all')
@@ -668,8 +689,43 @@ export default function ReceivablesPage() {
         return dueDate.getFullYear() === fy && dueDate.getMonth() + 1 === fm
       })
     }
+    if (sortColumn) {
+      result = [...result].sort((a, b) => {
+        let valA: string | number = 0
+        let valB: string | number = 0
+        switch (sortColumn) {
+          case 'invoiceCode':  valA = a.invoiceCode;  valB = b.invoiceCode;  break
+          case 'customerName': valA = a.customerName; valB = b.customerName; break
+          case 'invoiceDate':  valA = parseDDMMYYYY(a.invoiceDate).getTime(); valB = parseDDMMYYYY(b.invoiceDate).getTime(); break
+          case 'dueDate':      valA = parseDDMMYYYY(a.dueDate).getTime();     valB = parseDDMMYYYY(b.dueDate).getTime();     break
+          case 'netAmount':    valA = a.netAmount;    valB = b.netAmount;    break
+          case 'remaining':    valA = a.remaining;    valB = b.remaining;    break
+        }
+        if (valA < valB) return sortDirection === 'asc' ? -1 : 1
+        if (valA > valB) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    }
     return result
-  }, [invoices, searchText, searchScope, filterStatuses, filterInvoiceMonth, filterDueMonth])
+  }, [invoices, searchText, searchScope, filterStatuses, filterInvoiceMonth, filterDueMonth, sortColumn, sortDirection])
+
+  const filteredSummary = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const in7Days = new Date(today)
+    in7Days.setDate(in7Days.getDate() + 7)
+    return {
+      totalOutstanding: filteredInvoices
+        .filter(inv => inv.status !== 'Paid')
+        .reduce((sum, inv) => sum + inv.remaining, 0),
+      overdueCount: filteredInvoices.filter(inv => inv.isOverdue).length,
+      dueSoon7Days: filteredInvoices.filter(inv => {
+        if (inv.status === 'Paid' || inv.isOverdue) return false
+        const due = parseDDMMYYYY(inv.dueDate)
+        return due >= today && due <= in7Days
+      }).length,
+    }
+  }, [filteredInvoices])
 
   const fetchData = useCallback(async (isManual = false) => {
     if (isManual) setSyncing(true)
@@ -753,16 +809,17 @@ export default function ReceivablesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">{t('ar.summary.outstanding')}</p>
-            <p className="text-xl font-bold text-gray-900">{formatRupiah(summary.totalOutstanding)}</p>
+            <p className="text-xl font-bold text-gray-900">{formatRupiah(filteredSummary.totalOutstanding)}</p>
+            {hasActiveFilters && <p className="text-xs text-blue-500 mt-1">{filteredInvoices.length} / {invoices.length} invoices</p>}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">{t('ar.summary.overdue')}</p>
-            <p className="text-xl font-bold text-red-600">{summary.overdueCount}</p>
+            <p className="text-xl font-bold text-red-600">{filteredSummary.overdueCount}</p>
             <p className="text-xs text-gray-400">{t('ar.summary.invoices')}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">{t('ar.summary.dueSoon')}</p>
-            <p className="text-xl font-bold text-yellow-600">{summary.dueSoon7Days}</p>
+            <p className="text-xl font-bold text-yellow-600">{filteredSummary.dueSoon7Days}</p>
             <p className="text-xs text-gray-400">{t('ar.summary.invoices')}</p>
           </div>
         </div>
@@ -875,13 +932,13 @@ export default function ReceivablesPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.invoiceCode')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.customer')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.invoiceDate')}</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.dueDate')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.total')}</th>
+                  <th onClick={() => handleSort('invoiceCode')}  className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700">{t('ar.col.invoiceCode')}{sortIcon('invoiceCode')}</th>
+                  <th onClick={() => handleSort('customerName')} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700">{t('ar.col.customer')}{sortIcon('customerName')}</th>
+                  <th onClick={() => handleSort('invoiceDate')}  className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700">{t('ar.col.invoiceDate')}{sortIcon('invoiceDate')}</th>
+                  <th onClick={() => handleSort('dueDate')}      className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700">{t('ar.col.dueDate')}{sortIcon('dueDate')}</th>
+                  <th onClick={() => handleSort('netAmount')}    className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700">{t('ar.col.total')}{sortIcon('netAmount')}</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.paid')}</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.remaining')}</th>
+                  <th onClick={() => handleSort('remaining')}    className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700">{t('ar.col.remaining')}{sortIcon('remaining')}</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('ar.col.status')}</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">{t('common.actions')}</th>
                 </tr>
