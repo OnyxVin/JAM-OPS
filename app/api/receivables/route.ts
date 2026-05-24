@@ -42,11 +42,13 @@ export async function GET() {
         }))
 
       const totalAmount = safeParseFloat(inv.totalAmount)
+      const discount = safeParseFloat(inv.discount)
+      const netAmount = totalAmount * (1 - discount / 100)
       const totalPaid = matchingPayments.reduce((sum, p) => sum + p.amountPaid, 0)
-      const remaining = Math.max(0, totalAmount - totalPaid)
+      const remaining = Math.max(0, netAmount - totalPaid)
 
       let status: Invoice['status']
-      if (totalAmount > 0 && remaining < 0.005) status = 'Paid'
+      if (netAmount > 0 && remaining < 0.005) status = 'Paid'
       else if (totalPaid > 0) status = 'Partial'
       else status = 'Unpaid'
 
@@ -57,6 +59,7 @@ export async function GET() {
         ...inv,
         totalPaid,
         remaining,
+        netAmount,
         status,
         isOverdue,
         payments: matchingPayments,
@@ -97,9 +100,11 @@ export async function POST(request: NextRequest) {
 
     await createInvoice({
       invoiceCode,
-      customerName: String(customerName),
       invoiceDate: String(invoiceDate),
       dueDate: String(dueDate),
+      customerName: String(customerName),
+      address: body.address ? String(body.address) : '',
+      discount: body.discount ? String(body.discount) : '0',
       totalAmount: String(totalAmount),
     })
 

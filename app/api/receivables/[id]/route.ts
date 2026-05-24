@@ -25,9 +25,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     await updateInvoice(invoice.rowIndex, {
       invoiceCode:  body.invoiceCode  ?? invoice.invoiceCode,
-      customerName: body.customerName ?? invoice.customerName,
       invoiceDate:  body.invoiceDate  ?? invoice.invoiceDate,
       dueDate:      body.dueDate      ?? invoice.dueDate,
+      customerName: body.customerName ?? invoice.customerName,
+      address:      body.address      !== undefined ? String(body.address)  : invoice.address,
+      discount:     body.discount     !== undefined ? String(body.discount) : invoice.discount,
       totalAmount:  body.totalAmount  ?? invoice.totalAmount,
     })
 
@@ -69,10 +71,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const newTotal = existingTotal + safeFloat(String(amountPaid))
     const invoiceTotal = safeFloat(invoice.totalAmount)
-    const remaining = Math.max(0, invoiceTotal - newTotal)
+    const discount = safeFloat(invoice.discount)
+    const netTotal = invoiceTotal * (1 - discount / 100)
+    const remaining = Math.max(0, netTotal - newTotal)
 
     let newStatus: 'Unpaid' | 'Partial' | 'Paid'
-    if (invoiceTotal > 0 && remaining < 0.005) newStatus = 'Paid'
+    if (netTotal > 0 && remaining < 0.005) newStatus = 'Paid'
     else if (newTotal > 0) newStatus = 'Partial'
     else newStatus = 'Unpaid'
 

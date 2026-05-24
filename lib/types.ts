@@ -1,9 +1,12 @@
 export interface InvoiceRow {
   invoiceCode: string
-  customerName: string
   invoiceDate: string
   dueDate: string
+  customerName: string
+  address: string
+  discount: string
   totalAmount: string
+  status: string
   rowIndex: number
 }
 
@@ -40,6 +43,7 @@ export interface Payment {
 export interface Invoice extends InvoiceRow {
   totalPaid: number
   remaining: number
+  netAmount: number
   status: 'Unpaid' | 'Partial' | 'Paid'
   isOverdue: boolean
   payments: Payment[]
