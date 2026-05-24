@@ -43,7 +43,9 @@ function getSheetsAPI() {
 
 function buildColumnMap(headers: string[]): Record<string, number> {
   const map: Record<string, number> = {}
-  headers.forEach((h, i) => { map[h.trim()] = i })
+  headers.forEach((h, i) => {
+    map[h.trim().toLowerCase().replace(/\s+/g, ' ')] = i
+  })
   return map
 }
 
@@ -93,16 +95,16 @@ async function updateRow(
 export async function getAllInvoices(): Promise<InvoiceRow[]> {
   const rows = await getSheetValues(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES)
   if (rows.length < 1) return []
-  const col = buildColumnMap(rows[0])
+  const colMap = buildColumnMap(rows[0])
   return rows.slice(1).map((row, index) => ({
-    invoiceCode:  row[col['Invoice Code']]   ?? '',
-    invoiceDate:  row[col['Invoice Date']]   ?? '',
-    dueDate:      row[col['Due Date']]       ?? '',
-    customerName: row[col['Customer Name']]  ?? '',
-    address:      row[col['Address']]        ?? '',
-    discount:     row[col['Discount']]       ?? '0',
-    totalAmount:  row[col['Total Amount']]   ?? '0',
-    status:       row[col['Status']]         ?? 'Unpaid',
+    invoiceCode:  row[colMap['invoice code']]   ?? '',
+    invoiceDate:  row[colMap['invoice date']]   ?? '',
+    dueDate:      row[colMap['due date']]       ?? '',
+    customerName: row[colMap['customer name']]  ?? '',
+    address:      row[colMap['address']]        ?? '',
+    discount:     row[colMap['discount']]       ?? '0',
+    totalAmount:  row[colMap['total amount']]   ?? '0',
+    status:       row[colMap['status']]         ?? 'Unpaid',
     rowIndex:     index + 2,
   })).filter(r => r.invoiceCode !== '')
 }
@@ -118,17 +120,17 @@ export async function createInvoice(data: {
 }): Promise<void> {
   const rows = await getSheetValues(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES)
   if (rows.length < 1) throw new Error('Invoice sheet has no header row')
-  const col = buildColumnMap(rows[0])
-  const maxCol = Math.max(...Object.values(col)) + 1
+  const colMap = buildColumnMap(rows[0])
+  const maxCol = Math.max(...Object.values(colMap)) + 1
   const row = new Array(maxCol).fill('')
-  row[col['Invoice Code']]  = data.invoiceCode
-  row[col['Invoice Date']]  = data.invoiceDate
-  row[col['Due Date']]      = data.dueDate
-  row[col['Customer Name']] = data.customerName
-  row[col['Address']]       = data.address
-  row[col['Discount']]      = data.discount
-  row[col['Total Amount']]  = data.totalAmount
-  row[col['Status']]        = 'Unpaid'
+  row[colMap['invoice code']]  = data.invoiceCode
+  row[colMap['invoice date']]  = data.invoiceDate
+  row[colMap['due date']]      = data.dueDate
+  row[colMap['customer name']] = data.customerName
+  row[colMap['address']]       = data.address
+  row[colMap['discount']]      = data.discount
+  row[colMap['total amount']]  = data.totalAmount
+  row[colMap['status']]        = 'Unpaid'
   await appendRow(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES, row)
 }
 
@@ -138,34 +140,34 @@ export async function updateInvoice(
 ): Promise<void> {
   const rows = await getSheetValues(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES)
   if (rows.length < 1) throw new Error('Invoice sheet has no header row')
-  const col = buildColumnMap(rows[0])
+  const colMap = buildColumnMap(rows[0])
   const existing = rows.slice(1).find((_, i) => i + 2 === rowIndex)
   if (!existing) throw new Error(`Invoice row ${rowIndex} not found`)
 
-  const maxCol = Math.max(...Object.values(col)) + 1
+  const maxCol = Math.max(...Object.values(colMap)) + 1
   const row = new Array(maxCol).fill('')
-  row[col['Invoice Code']]  = data.invoiceCode  ?? existing[col['Invoice Code']]  ?? ''
-  row[col['Invoice Date']]  = data.invoiceDate  ?? existing[col['Invoice Date']]  ?? ''
-  row[col['Due Date']]      = data.dueDate      ?? existing[col['Due Date']]      ?? ''
-  row[col['Customer Name']] = data.customerName ?? existing[col['Customer Name']] ?? ''
-  row[col['Address']]       = data.address      ?? existing[col['Address']]       ?? ''
-  row[col['Discount']]      = data.discount     ?? existing[col['Discount']]      ?? '0'
-  row[col['Total Amount']]  = data.totalAmount  ?? existing[col['Total Amount']]  ?? '0'
-  row[col['Status']]        = data.status       ?? existing[col['Status']]        ?? 'Unpaid'
+  row[colMap['invoice code']]  = data.invoiceCode  ?? existing[colMap['invoice code']]  ?? ''
+  row[colMap['invoice date']]  = data.invoiceDate  ?? existing[colMap['invoice date']]  ?? ''
+  row[colMap['due date']]      = data.dueDate      ?? existing[colMap['due date']]      ?? ''
+  row[colMap['customer name']] = data.customerName ?? existing[colMap['customer name']] ?? ''
+  row[colMap['address']]       = data.address      ?? existing[colMap['address']]       ?? ''
+  row[colMap['discount']]      = data.discount     ?? existing[colMap['discount']]      ?? '0'
+  row[colMap['total amount']]  = data.totalAmount  ?? existing[colMap['total amount']]  ?? '0'
+  row[colMap['status']]        = data.status       ?? existing[colMap['status']]        ?? 'Unpaid'
   await updateRow(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES, rowIndex, row)
 }
 
 export async function updateInvoiceStatus(rowIndex: number, status: string): Promise<void> {
   const rows = await getSheetValues(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES)
   if (rows.length < 1) throw new Error('Invoice sheet has no header row')
-  const col = buildColumnMap(rows[0])
+  const colMap = buildColumnMap(rows[0])
   const existing = rows.slice(1).find((_, i) => i + 2 === rowIndex)
   if (!existing) throw new Error(`Invoice row ${rowIndex} not found`)
 
-  const maxCol = Math.max(...Object.values(col)) + 1
+  const maxCol = Math.max(...Object.values(colMap)) + 1
   const row = new Array(maxCol).fill('')
-  Object.values(col).forEach(i => { row[i] = existing[i] ?? '' })
-  row[col['Status']] = status
+  Object.values(colMap).forEach(i => { row[i] = existing[i] ?? '' })
+  row[colMap['status']] = status
   await updateRow(SHEET_ID_AR_INVOICES, TAB_AR_INVOICES, rowIndex, row)
 }
 
