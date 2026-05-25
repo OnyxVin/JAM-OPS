@@ -68,6 +68,14 @@ export interface CanvasRun extends CanvasRunRow {
   totalQuantitySold: number | null
 }
 
+export interface InventoryItem {
+  id: number
+  itemCode: string
+  partNumber: string
+  itemName: string
+  brand: string
+}
+
 export interface ARSummary {
   totalOutstanding: number
   overdueCount: number

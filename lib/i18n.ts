@@ -4,6 +4,7 @@ export const translations = {
   // Navigation
   'nav.receivables':    { en: 'AR Tracker',       id: 'Pelacak Piutang' },
   'nav.canvas':         { en: 'Canvas Tracker',   id: 'Pelacak Canvas' },
+  'nav.inventory':      { en: 'Inventory',        id: 'Inventaris' },
   'nav.home':           { en: 'Home',             id: 'Beranda' },
 
   // Home page

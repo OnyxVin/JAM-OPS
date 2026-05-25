@@ -73,9 +73,12 @@ export async function POST(request: NextRequest) {
 
     await createCanvasRun({ canvasId, salesRepName: String(salesRepName), dateOut: String(dateOut) })
     await createCanvasItems(
-      items.map((item: { itemName: string; quantityBrought: string }) => ({
+      items.map((item: { itemCode?: string; partNumber?: string; itemName: string; brand?: string; quantityBrought: string }) => ({
         canvasId,
-        itemName: String(item.itemName),
+        itemCode:        String(item.itemCode ?? ''),
+        partNumber:      String(item.partNumber ?? ''),
+        itemName:        String(item.itemName),
+        brand:           String(item.brand ?? ''),
         quantityBrought: String(item.quantityBrought),
       }))
     )

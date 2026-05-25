@@ -324,7 +324,14 @@ export async function getAllCanvasItems(): Promise<CanvasItemRow[]> {
 }
 
 export async function createCanvasItems(
-  items: Array<{ canvasId: string; itemName: string; quantityBrought: string }>
+  items: Array<{
+    canvasId: string
+    itemCode: string
+    partNumber: string
+    itemName: string
+    brand: string
+    quantityBrought: string
+  }>
 ): Promise<void> {
   const rows = await getSheetValues(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS)
   if (rows.length < 1) throw new Error('Canvas items sheet has no header row')
@@ -332,9 +339,12 @@ export async function createCanvasItems(
   const maxCol = Math.max(...Object.values(colMap)) + 1
   for (const item of items) {
     const row = new Array(maxCol).fill('')
-    row[colMap['canvas_id']]        = item.canvasId
-    row[colMap['item name']]        = item.itemName
-    row[colMap['quantity brought']] = item.quantityBrought
+    if (colMap['canvas_id']        != null) row[colMap['canvas_id']]        = item.canvasId
+    if (colMap['item code']        != null) row[colMap['item code']]        = item.itemCode
+    if (colMap['part number']      != null) row[colMap['part number']]      = item.partNumber
+    if (colMap['item name']        != null) row[colMap['item name']]        = item.itemName
+    if (colMap['brand']            != null) row[colMap['brand']]            = item.brand
+    if (colMap['quantity brought'] != null) row[colMap['quantity brought']] = item.quantityBrought
     await appendRow(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS, row)
   }
 }
