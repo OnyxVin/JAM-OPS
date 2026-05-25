@@ -124,3 +124,61 @@ First working version deployed to Vercel. Built entirely from scratch.
 - **Before:** Total Outstanding, Overdue count, and Due in 7 Days always reflected all invoices regardless of any active filters.
 - **After:** All three summary figures recalculate dynamically from only the invoices currently visible after filtering. For example, filtering to May invoices shows only May's outstanding balance and overdue count.
 - When a filter is active, a small indicator appears beneath Total Outstanding showing `X / Y invoices` (filtered count vs. total count).
+
+---
+
+## v1.3.1 — 25 May 2026
+### Canvas Items: Header-Driven Columns + Dual Qty Input on Close
+
+**Improvement — Header-driven Canvas Items columns**
+- Canvas Items sheet columns are now read by header name, not fixed index — same pattern as AR Invoices. Adding or reordering columns in the Google Sheet no longer silently breaks Canvas data.
+
+**Change — Close Run modal now collects both Qty Returned and Qty Sold**
+- **Before:** Close Run modal only asked for Qty Returned; Qty Sold was auto-computed as Brought − Returned.
+- **After:** Both Qty Returned and Qty Sold are entered directly as separate inputs. Both columns are shown in the closed run items table.
+- **Reason:** Qty Sold is the business-critical number (revenue); auto-computing it from Qty Returned introduced rounding and assumption errors.
+
+---
+
+## v1.4.0 — 25 May 2026
+### Deployment Workflow: Staging Branch
+
+**New workflow — Staging branch for safe deployments**
+- A permanent `staging` branch now exists alongside `main`. All code changes go to `staging` first.
+- Vercel automatically deploys `staging` to its own live preview URL every time it is pushed.
+- Only after testing on the staging URL does code get merged into `main` to update production.
+- This prevents a broken change from reaching the production app while it is still being tested.
+
+**Vercel features now in use**
+- **Promote to Production** — once staging is confirmed working, the deployment can be promoted to production from the Vercel dashboard without an additional git push.
+- **Instant Rollback** — if a bad deployment reaches production, the previous working deployment can be restored in seconds from the Vercel dashboard with no code changes required.
+
+---
+
+## Lessons Learned — For Future CLAUDE.md Refinement
+
+These are non-obvious mistakes and discoveries made during this project. Use these to improve the starting instructions for the next web app.
+
+### 1. Vercel environment variables are not automatic
+The `.env` file on disk is never sent to Vercel. Every variable must be set explicitly in the Vercel project dashboard, or pushed via `vercel env push .env`. After any change to environment variables in Vercel, a manual redeploy is required — Vercel does not apply env changes to an already-deployed build. Always verify env vars are present after a fresh Vercel project setup before testing any feature.
+
+### 2. Never use token.json on Vercel
+Vercel's filesystem is ephemeral — files written between deployments or serverless invocations do not persist. Any OAuth flow that writes `token.json` locally will fail silently in production. All credentials must live in environment variables from the start.
+
+### 3. Always use UNFORMATTED_VALUE when reading Google Sheets numbers
+Without `valueRenderOption: 'UNFORMATTED_VALUE'`, Google Sheets returns numbers as locale-formatted strings (e.g. `"15.623.000"` in Indonesian locale). `parseFloat` misreads these as decimals, silently producing near-zero values. Always set this option on every Sheets API read call.
+
+### 4. Google Sheets date serial numbers must be converted
+When `UNFORMATTED_VALUE` is active, date-type cells come through as raw integers (days since 30 Dec 1899). A `normalizeDate()` helper must be applied to every date field on read: if the value is a number greater than 1000, convert it — otherwise pass through as-is. Do not assume dates will always be strings.
+
+### 5. Never read Google Sheets columns by fixed index
+Using `row[0]`, `row[1]`, `row[2]` breaks the moment anyone reorders or adds a column in the spreadsheet. Always build a `colMap` from the header row on every read, then access fields by name (`row[colMap['invoice code']]`). Normalize all header names to lowercase and trim whitespace before mapping.
+
+### 6. Staging branch from day one
+Pushing directly to `main` means every experiment and half-finished fix goes live immediately. A permanent `staging` branch should be created at project start — not added later after a production incident. The cost is two commands once; the benefit is production never sees broken code.
+
+### 7. Temporary debug endpoints are a valid diagnostic tool
+When a production-only bug cannot be reproduced locally, a temporary route (e.g. `/api/debug-sheet`) that reads and returns raw env vars, header rows, and row counts is the fastest way to diagnose. Add it, push, read the output, remove it. Don't try to diagnose a Vercel deployment issue purely from local runs.
+
+### 8. Vercel deployment glitches can corrupt env var propagation
+Even without touching env vars manually, a Vercel deployment can occasionally fail to pick up all environment variables correctly. Symptoms: data shows as all zeros or empty, but local dev works perfectly. The fix is to re-push env vars via `vercel env push .env` and trigger a fresh redeploy. The staging branch workflow limits the blast radius of this to the preview URL.
