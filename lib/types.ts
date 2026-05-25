@@ -34,6 +34,7 @@ export interface CanvasItemRow {
   brand: string
   quantityBrought: string
   quantitySold: string
+  quantityReturned: string
 }
 
 export interface Payment {
@@ -60,6 +61,7 @@ export interface CanvasItem {
   brand: string
   quantityBrought: number
   quantitySold: number | null
+  quantityReturned: number | null
 }
 
 export interface CanvasRun extends CanvasRunRow {

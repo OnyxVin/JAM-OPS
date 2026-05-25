@@ -19,14 +19,20 @@ export async function GET() {
               ? parseInt(item.quantitySold) || 0
               : null
 
+          const quantityReturned =
+            run.status === 'Closed' && item.quantityReturned !== ''
+              ? parseInt(item.quantityReturned) || 0
+              : null
+
           return {
-            canvasId:    item.canvasId,
-            itemCode:    item.itemCode,
-            partNumber:  item.partNumber,
-            itemName:    item.itemName,
-            brand:       item.brand,
+            canvasId:         item.canvasId,
+            itemCode:         item.itemCode,
+            partNumber:       item.partNumber,
+            itemName:         item.itemName,
+            brand:            item.brand,
             quantityBrought,
             quantitySold,
+            quantityReturned,
           }
         })
 

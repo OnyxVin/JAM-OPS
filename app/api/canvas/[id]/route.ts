@@ -103,9 +103,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     await closeCanvasRun(run.rowIndex, String(dateClosed))
     await updateCanvasItemsSold(
       canvasId,
-      soldItems.map((item: { itemName: string; quantitySold: string }) => ({
-        itemName: String(item.itemName),
-        quantitySold: String(item.quantitySold),
+      soldItems.map((item: { itemName: string; quantitySold: string; quantityReturned?: string }) => ({
+        itemName:         String(item.itemName),
+        quantitySold:     String(item.quantitySold),
+        quantityReturned: item.quantityReturned ? String(item.quantityReturned) : undefined,
       }))
     )
 

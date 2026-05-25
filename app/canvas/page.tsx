@@ -75,6 +75,9 @@ function ItemsTable({ run }: { run: CanvasRun }) {
           {run.status === 'Closed' && (
             <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.sold')}</th>
           )}
+          {run.status === 'Closed' && (
+            <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.returned')}</th>
+          )}
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100 bg-white">
@@ -84,6 +87,9 @@ function ItemsTable({ run }: { run: CanvasRun }) {
             <td className="px-3 py-2 text-center text-gray-600">{item.quantityBrought}</td>
             {run.status === 'Closed' && (
               <td className="px-3 py-2 text-center font-medium text-blue-700">{item.quantitySold ?? '—'}</td>
+            )}
+            {run.status === 'Closed' && (
+              <td className="px-3 py-2 text-center text-gray-600">{item.quantityReturned ?? '—'}</td>
             )}
           </tr>
         ))}
@@ -512,6 +518,9 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
     Object.fromEntries(run.items.map((item) => [item.itemName, '']))
   )
+  const [returnedQtys, setReturnedQtys] = useState<Record<string, string>>(
+    Object.fromEntries(run.items.map((item) => [item.itemName, '']))
+  )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -522,8 +531,9 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
     setSaveError('')
     try {
       const soldItems = run.items.map((item) => ({
-        itemName: item.itemName,
-        quantitySold: soldQtys[item.itemName] ?? '0',
+        itemName:         item.itemName,
+        quantitySold:     soldQtys[item.itemName] ?? '0',
+        quantityReturned: returnedQtys[item.itemName] ?? '0',
       }))
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
@@ -572,17 +582,32 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
                   <span className="text-xs text-gray-400 whitespace-nowrap">
                     {t('canvas.item.brought')}: {item.quantityBrought}
                   </span>
-                  <input
-                    type="number"
-                    min="0"
-                    max={item.quantityBrought}
-                    className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={t('canvas.modal.newRun.ph.qty')}
-                    value={soldQtys[item.itemName] ?? ''}
-                    onChange={(e) =>
-                      setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })
-                    }
-                  />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-xs text-gray-400">{t('canvas.item.sold')}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0"
+                      value={soldQtys[item.itemName] ?? ''}
+                      onChange={(e) =>
+                        setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-xs text-gray-400">{t('canvas.item.returned')}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-16 px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0"
+                      value={returnedQtys[item.itemName] ?? ''}
+                      onChange={(e) =>
+                        setReturnedQtys({ ...returnedQtys, [item.itemName]: e.target.value })
+                      }
+                    />
+                  </div>
                 </div>
               ))}
             </div>
