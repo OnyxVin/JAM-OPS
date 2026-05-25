@@ -28,9 +28,12 @@ export interface CanvasRunRow {
 
 export interface CanvasItemRow {
   canvasId: string
+  itemCode: string
+  partNumber: string
   itemName: string
+  brand: string
   quantityBrought: string
-  quantityReturned: string
+  quantitySold: string
 }
 
 export interface Payment {
@@ -51,9 +54,11 @@ export interface Invoice extends InvoiceRow {
 
 export interface CanvasItem {
   canvasId: string
+  itemCode: string
+  partNumber: string
   itemName: string
+  brand: string
   quantityBrought: number
-  quantityReturned: number | null
   quantitySold: number | null
 }
 

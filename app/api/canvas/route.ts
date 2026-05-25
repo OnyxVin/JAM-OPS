@@ -14,18 +14,18 @@ export async function GET() {
         .filter((item) => item.canvasId === run.canvasId)
         .map((item) => {
           const quantityBrought = parseInt(item.quantityBrought) || 0
-          const quantityReturned =
-            run.status === 'Closed' && item.quantityReturned !== ''
-              ? parseInt(item.quantityReturned) || 0
-              : null
           const quantitySold =
-            quantityReturned !== null ? quantityBrought - quantityReturned : null
+            run.status === 'Closed' && item.quantitySold !== ''
+              ? parseInt(item.quantitySold) || 0
+              : null
 
           return {
-            canvasId: item.canvasId,
-            itemName: item.itemName,
+            canvasId:    item.canvasId,
+            itemCode:    item.itemCode,
+            partNumber:  item.partNumber,
+            itemName:    item.itemName,
+            brand:       item.brand,
             quantityBrought,
-            quantityReturned,
             quantitySold,
           }
         })

@@ -160,8 +160,8 @@ export const translations = {
   // Canvas Tracker — Close Run modal
   'canvas.modal.closeRun.title':      { en: 'Close Canvas Run',  id: 'Selesaikan Canvas Run' },
   'canvas.modal.closeRun.dateClosed': { en: 'Date Closed',       id: 'Tanggal Selesai' },
-  'canvas.modal.closeRun.returnQty':  { en: 'Quantity Returned', id: 'Jumlah Dikembalikan' },
-  'canvas.modal.closeRun.items':      { en: 'Return Quantities', id: 'Jumlah Pengembalian' },
+  'canvas.modal.closeRun.returnQty':  { en: 'Quantity Sold',     id: 'Jumlah Terjual' },
+  'canvas.modal.closeRun.items':      { en: 'Sale Quantities',   id: 'Jumlah Penjualan' },
 
   // Canvas Tracker — edit/delete
   'canvas.editRun':              { en: 'Edit Run',         id: 'Edit Run' },

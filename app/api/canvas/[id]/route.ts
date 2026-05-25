@@ -3,7 +3,7 @@ import {
   getAllCanvasRuns,
   closeCanvasRun,
   createCanvasItems,
-  updateCanvasItemsReturned,
+  updateCanvasItemsSold,
   updateCanvasRun,
   deleteCanvasRun,
   deleteCanvasItemsByRunId,
@@ -88,9 +88,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const canvasId = params.id
     const body = await request.json()
-    const { dateClosed, returnedItems } = body
+    const { dateClosed, soldItems } = body
 
-    if (!dateClosed || !Array.isArray(returnedItems)) {
+    if (!dateClosed || !Array.isArray(soldItems)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -101,11 +101,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     await closeCanvasRun(run.rowIndex, String(dateClosed))
-    await updateCanvasItemsReturned(
+    await updateCanvasItemsSold(
       canvasId,
-      returnedItems.map((item: { itemName: string; quantityReturned: string }) => ({
+      soldItems.map((item: { itemName: string; quantitySold: string }) => ({
         itemName: String(item.itemName),
-        quantityReturned: String(item.quantityReturned),
+        quantitySold: String(item.quantitySold),
       }))
     )
 

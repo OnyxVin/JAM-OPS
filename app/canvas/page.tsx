@@ -73,10 +73,7 @@ function ItemsTable({ run }: { run: CanvasRun }) {
           <th className="px-3 py-2 text-left text-gray-500 font-semibold">{t('canvas.item.name')}</th>
           <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.brought')}</th>
           {run.status === 'Closed' && (
-            <>
-              <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.returned')}</th>
-              <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.sold')}</th>
-            </>
+            <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.sold')}</th>
           )}
         </tr>
       </thead>
@@ -86,10 +83,7 @@ function ItemsTable({ run }: { run: CanvasRun }) {
             <td className="px-3 py-2 text-gray-700">{item.itemName}</td>
             <td className="px-3 py-2 text-center text-gray-600">{item.quantityBrought}</td>
             {run.status === 'Closed' && (
-              <>
-                <td className="px-3 py-2 text-center text-gray-600">{item.quantityReturned ?? '—'}</td>
-                <td className="px-3 py-2 text-center font-medium text-blue-700">{item.quantitySold ?? '—'}</td>
-              </>
+              <td className="px-3 py-2 text-center font-medium text-blue-700">{item.quantitySold ?? '—'}</td>
             )}
           </tr>
         ))}
@@ -515,7 +509,7 @@ interface CloseRunModalProps {
 function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   const { t } = useLanguage()
   const [dateClosed, setDateClosed] = useState(toInputDate(todayDDMMYYYY()))
-  const [returnedQtys, setReturnedQtys] = useState<Record<string, string>>(
+  const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
     Object.fromEntries(run.items.map((item) => [item.itemName, '']))
   )
   const [saving, setSaving] = useState(false)
@@ -527,16 +521,16 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
     setSaving(true)
     setSaveError('')
     try {
-      const returnedItems = run.items.map((item) => ({
+      const soldItems = run.items.map((item) => ({
         itemName: item.itemName,
-        quantityReturned: returnedQtys[item.itemName] ?? '0',
+        quantitySold: soldQtys[item.itemName] ?? '0',
       }))
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dateClosed: fromInputDate(dateClosed),
-          returnedItems,
+          soldItems,
         }),
       })
       if (!res.ok) throw new Error()
@@ -584,9 +578,9 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
                     max={item.quantityBrought}
                     className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder={t('canvas.modal.newRun.ph.qty')}
-                    value={returnedQtys[item.itemName] ?? ''}
+                    value={soldQtys[item.itemName] ?? ''}
                     onChange={(e) =>
-                      setReturnedQtys({ ...returnedQtys, [item.itemName]: e.target.value })
+                      setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })
                     }
                   />
                 </div>

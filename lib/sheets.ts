@@ -310,24 +310,32 @@ export async function closeCanvasRun(
 
 export async function getAllCanvasItems(): Promise<CanvasItemRow[]> {
   const rows = await getSheetValues(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS)
+  if (rows.length < 1) return []
+  const colMap = buildColumnMap(rows[0])
   return rows.slice(1).map((row) => ({
-    canvasId:         row[0] ?? '',
-    itemName:         row[1] ?? '',
-    quantityBrought:  row[2] ?? '0',
-    quantityReturned: row[3] ?? '',
+    canvasId:        row[colMap['canvas_id']]        ?? '',
+    itemCode:        row[colMap['item code']]         ?? '',
+    partNumber:      row[colMap['part number']]       ?? '',
+    itemName:        row[colMap['item name']]         ?? '',
+    brand:           row[colMap['brand']]             ?? '',
+    quantityBrought: row[colMap['quantity brought']]  ?? '0',
+    quantitySold:    row[colMap['quantity sold']]     ?? '',
   })).filter(r => r.canvasId !== '')
 }
 
 export async function createCanvasItems(
   items: Array<{ canvasId: string; itemName: string; quantityBrought: string }>
 ): Promise<void> {
+  const rows = await getSheetValues(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS)
+  if (rows.length < 1) throw new Error('Canvas items sheet has no header row')
+  const colMap = buildColumnMap(rows[0])
+  const maxCol = Math.max(...Object.values(colMap)) + 1
   for (const item of items) {
-    await appendRow(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS, [
-      item.canvasId,
-      item.itemName,
-      item.quantityBrought,
-      '',
-    ])
+    const row = new Array(maxCol).fill('')
+    row[colMap['canvas_id']]        = item.canvasId
+    row[colMap['item name']]        = item.itemName
+    row[colMap['quantity brought']] = item.quantityBrought
+    await appendRow(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS, row)
   }
 }
 
@@ -355,9 +363,11 @@ export async function deleteCanvasRun(rowIndex: number): Promise<void> {
 
 export async function deleteCanvasItemsByRunId(canvasId: string): Promise<void> {
   const rows = await getSheetValues(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS)
+  if (rows.length < 1) return
+  const colMap = buildColumnMap(rows[0])
   const rowNumbers: number[] = []
   rows.slice(1).forEach((row, index) => {
-    if ((row[0] ?? '') === canvasId) rowNumbers.push(index + 2)
+    if ((row[colMap['canvas_id']] ?? '') === canvasId) rowNumbers.push(index + 2)
   })
   for (const rowNum of [...rowNumbers].reverse()) {
     await deleteSheetRow(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS, rowNum)
@@ -402,26 +412,28 @@ export async function getNextCanvasId(dateOut: string): Promise<string> {
   return `${prefix}${String(maxSerial + 1).padStart(4, '0')}`
 }
 
-export async function updateCanvasItemsReturned(
+export async function updateCanvasItemsSold(
   canvasId: string,
-  returned: Array<{ itemName: string; quantityReturned: string }>
+  sold: Array<{ itemName: string; quantitySold: string }>
 ): Promise<void> {
   const rows = await getSheetValues(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS)
+  if (rows.length < 1) return
+  const colMap = buildColumnMap(rows[0])
   const dataRows = rows.slice(1)
+  const maxCol = Math.max(...Object.values(colMap)) + 1
 
-  for (const ret of returned) {
+  for (const s of sold) {
     const dataIndex = dataRows.findIndex(
-      (row) => (row[0] ?? '') === canvasId && (row[1] ?? '') === ret.itemName
+      (row) => (row[colMap['canvas_id']] ?? '') === canvasId &&
+                (row[colMap['item name']] ?? '') === s.itemName
     )
     if (dataIndex === -1) continue
 
     const sheetRowNumber = dataIndex + 2
     const existing = dataRows[dataIndex]
-    await updateRow(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS, sheetRowNumber, [
-      existing[0] ?? '',
-      existing[1] ?? '',
-      existing[2] ?? '',
-      ret.quantityReturned,
-    ])
+    const row = new Array(maxCol).fill('')
+    Object.values(colMap).forEach(i => { row[i] = existing[i] ?? '' })
+    row[colMap['quantity sold']] = s.quantitySold
+    await updateRow(SHEET_ID_CANVAS_ITEMS, TAB_CANVAS_ITEMS, sheetRowNumber, row)
   }
 }
