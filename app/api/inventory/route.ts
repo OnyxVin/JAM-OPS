@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 import type { InventoryItem } from '@/lib/types'
 
 export async function GET() {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('inventory')
       .select('*')
       .order('item_name', { ascending: true })
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Item name is required' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('inventory')
       .insert({
         item_code:     String(itemCode ?? ''),

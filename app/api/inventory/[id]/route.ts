@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { getSupabase } from '@/lib/supabase'
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: 'Item name is required' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('inventory')
       .update({
         item_code:     String(itemCode ?? ''),
@@ -49,7 +49,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
     const id = parseInt(params.id)
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
-    const { error } = await supabase.from('inventory').delete().eq('id', id)
+    const { error } = await getSupabase().from('inventory').delete().eq('id', id)
     if (error) throw error
 
     return NextResponse.json({ success: true })
