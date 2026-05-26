@@ -659,9 +659,6 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
     Object.fromEntries(run.items.map((item) => [item.itemName, '']))
   )
-  const [returnedQtys, setReturnedQtys] = useState<Record<string, string>>(
-    Object.fromEntries(run.items.map((item) => [item.itemName, '']))
-  )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -671,11 +668,15 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
     setSaving(true)
     setSaveError('')
     try {
-      const soldItems = run.items.map((item) => ({
-        itemName:         item.itemName,
-        quantitySold:     soldQtys[item.itemName]     || '0',
-        quantityReturned: returnedQtys[item.itemName] || '0',
-      }))
+      const soldItems = run.items.map((item) => {
+        const sold = parseInt(soldQtys[item.itemName] || '0') || 0
+        const returned = item.quantityBrought - sold
+        return {
+          itemName:         item.itemName,
+          quantitySold:     String(sold),
+          quantityReturned: String(returned >= 0 ? returned : 0),
+        }
+      })
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -713,15 +714,14 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
 
           <div>
             <p className="text-xs font-medium text-gray-700 mb-2">{t('canvas.modal.closeRun.items')}</p>
-            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
               <span />
               <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
               <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
-              <span className="text-xs text-amber-600 text-center whitespace-nowrap">{t('canvas.item.returned')}</span>
             </div>
             <div className="space-y-2">
               {run.items.map((item) => (
-                <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center">
+                <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center">
                   <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
                   <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
                   <input
@@ -732,15 +732,6 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
                     placeholder="0"
                     value={soldQtys[item.itemName] ?? ''}
                     onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    max={item.quantityBrought}
-                    className="w-20 px-2 py-1.5 border border-amber-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    placeholder="0"
-                    value={returnedQtys[item.itemName] ?? ''}
-                    onChange={(e) => setReturnedQtys({ ...returnedQtys, [item.itemName]: e.target.value })}
                   />
                 </div>
               ))}
@@ -782,12 +773,6 @@ function EditQuantitiesModal({ run, onClose, onSaved }: EditQuantitiesModalProps
       item.quantitySold !== null ? String(item.quantitySold) : '',
     ]))
   )
-  const [returnedQtys, setReturnedQtys] = useState<Record<string, string>>(
-    Object.fromEntries(run.items.map((item) => [
-      item.itemName,
-      item.quantityReturned !== null ? String(item.quantityReturned) : '',
-    ]))
-  )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -796,11 +781,15 @@ function EditQuantitiesModal({ run, onClose, onSaved }: EditQuantitiesModalProps
     setSaving(true)
     setSaveError('')
     try {
-      const soldItems = run.items.map((item) => ({
-        itemName:         item.itemName,
-        quantitySold:     soldQtys[item.itemName]     || '0',
-        quantityReturned: returnedQtys[item.itemName] || '0',
-      }))
+      const soldItems = run.items.map((item) => {
+        const sold = parseInt(soldQtys[item.itemName] || '0') || 0
+        const returned = item.quantityBrought - sold
+        return {
+          itemName:         item.itemName,
+          quantitySold:     String(sold),
+          quantityReturned: String(returned >= 0 ? returned : 0),
+        }
+      })
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -826,32 +815,24 @@ function EditQuantitiesModal({ run, onClose, onSaved }: EditQuantitiesModalProps
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
-          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
             <span />
             <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
             <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
-            <span className="text-xs text-amber-600 text-center whitespace-nowrap">{t('canvas.item.returned')}</span>
           </div>
           <div className="space-y-2">
             {run.items.map((item) => (
-              <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center">
+              <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center">
                 <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
                 <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
                 <input
                   type="number"
                   min="0"
+                  max={item.quantityBrought}
                   className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="0"
                   value={soldQtys[item.itemName] ?? ''}
                   onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
-                />
-                <input
-                  type="number"
-                  min="0"
-                  className="w-20 px-2 py-1.5 border border-amber-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  placeholder="0"
-                  value={returnedQtys[item.itemName] ?? ''}
-                  onChange={(e) => setReturnedQtys({ ...returnedQtys, [item.itemName]: e.target.value })}
                 />
               </div>
             ))}

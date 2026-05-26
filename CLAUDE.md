@@ -1,107 +1,158 @@
-# CLAUDE.md
+# Agent Instructions — Web App Development
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+You are a web application builder. Your job is to produce complete, functional, production-ready features — not prototypes, not implementations that only work when everything goes right. Every feature you build must meet the standards defined in this document before it is considered done.
 
----
-
-## Commands
-
-```bash
-npm run dev        # start dev server on localhost:3000
-npm run build      # production build (runs type-check + Next.js build)
-npm run lint       # ESLint via next lint
-npx tsc --noEmit   # type-check only, no output files
-```
-
-No test suite exists. Verify features by running the dev server and interacting with the app.
+Stay pragmatic. Stay reliable. Keep learning.
 
 ---
 
-## Architecture
+## Project Initialization
 
-**JAM OPS** is a Next.js 14 App Router app for a B2B car spare parts business. Two modules:
+When this file is first executed in a new project, before doing anything else:
 
-- **AR Tracker** (`/receivables`) — tracks customer invoices (create/edit/delete), payments, and overdue status
-- **Canvas Tracker** (`/canvas`) — tracks sales rep field runs: items brought out, items sold, run open/close lifecycle
+1. Check if `.env` exists — if not, create it
+2. Check if `.env.example` exists — if not, create it
+3. Check if `.env` is listed in `.gitignore` — if not, add it
+4. Confirm initialization is complete before proceeding
 
-### Data layer — Google Sheets as the database
-
-All reads and writes go through `lib/sheets.ts`. The app uses **four separate Google Sheets spreadsheets**, each with its own `SHEET_ID` and `TAB_NAME` env var:
-
-| Module | Sheet | Env vars |
-|---|---|---|
-| AR | AR_Invoices | `GOOGLE_SHEET_ID_AR_INVOICES`, `GOOGLE_TAB_AR_INVOICES` |
-| AR | AR_Payments | `GOOGLE_SHEET_ID_AR_PAYMENTS`, `GOOGLE_TAB_AR_PAYMENTS` |
-| Canvas | Canvas_Runs | `GOOGLE_SHEET_ID_CANVAS_RUNS`, `GOOGLE_TAB_CANVAS_RUNS` |
-| Canvas | Canvas_Items | `GOOGLE_SHEET_ID_CANVAS_ITEMS`, `GOOGLE_TAB_CANVAS_ITEMS` |
-
-**Canvas_Items sheet headers (exact, case-insensitive):**
-`Canvas_ID | Item Code | Part Number | Item Name | Brand | Quantity Brought | Quantity Sold | Date Closed | Status`
-
-**AR_Invoices sheet headers (exact, case-insensitive):**
-`Invoice Code | Customer Name | Invoice Date | Due Date | Total Amount | Discount | Address | Status`
-
-#### Critical `lib/sheets.ts` patterns
-
-- `getSheetValues()` always uses `valueRenderOption: 'UNFORMATTED_VALUE'` — returns raw numbers, not locale-formatted strings like `"15.623.000"`.
-- `buildColumnMap(headers)` normalizes headers to lowercase + trimmed, so column order in the sheet doesn't matter. Always look up columns by name, never by index.
-- `normalizeDate(value)` converts Google Sheets serial numbers (integers like `46118`) to `DD/MM/YYYY`. Applied on every date field read.
-- All dates are stored and passed as `DD/MM/YYYY` strings throughout the app. HTML `<input type="date">` uses `YYYY-MM-DD`, converted by `toInputDate()` / `fromInputDate()` helpers in each page.
-- Row writes: read the full row first, build a new array sized to `max(colMap values) + 1`, fill from `colMap` lookups, then call `updateRow()`. This preserves columns the app doesn't manage.
-
-### Auth
-
-`middleware.ts` protects every route except `/login` and `/api/auth`. Session is an httpOnly cookie set by `POST /api/auth`. Password is `process.env.NEXT_PUBLIC_APP_PASSWORD`.
-
-Google OAuth uses only env vars — no `token.json` file at runtime:
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`
-
-### i18n
-
-All UI text goes through `lib/i18n.ts` + `lib/LanguageContext.tsx`. Language is toggled in the nav and stored in `localStorage`. Translation keys are namespaced: `nav.*`, `common.*`, `ar.*`, `canvas.*`, `status.*`. The `t(key)` hook is available everywhere via `useLanguage()`.
-
-### ID / code generation
-
-- Invoice codes: `FP{YY}{MM}{NNNN}` — e.g. `FP260500001`
-- Canvas IDs: `CVS{YY}{MM}{NNNN}` — e.g. `CVS260500001`
-- Auto-generated on the server via `/api/receivables/next-code` and `/api/canvas/next-id`, but users can override them manually.
-
-### API routes
-
-All backend logic lives in `app/api/`. Route handlers use Node.js runtime (never `export const runtime = 'edge'`). Pattern:
-
-- `GET /api/receivables` — joins AR_Invoices + AR_Payments, computes status, returns `{ invoices, summary }`
-- `POST /api/receivables` — create invoice
-- `PATCH /api/receivables/[id]` — edit invoice fields
-- `POST /api/receivables/[id]` — add payment, recomputes and writes status back to sheet
-- `DELETE /api/receivables/[id]` — delete invoice + all its payments
-
-Canvas follows the same pattern: `GET /api/canvas`, `POST`, `PUT` (edit run), `PATCH` (close run + write sold qtys), `DELETE`.
-
-### Page architecture
-
-Both `/receivables/page.tsx` and `/canvas/page.tsx` are `'use client'` components. They fetch from their API route, hold all state locally, and refresh every 30 seconds via `setInterval`. Filtering and sorting are pure client-side `useMemo` over the fetched array — no re-fetching on filter change.
+Do not skip this step. These files must exist before any development begins.
 
 ---
 
-## Quality gates
+## How to Operate
 
-Before declaring any feature done, verify:
+### 1. Plan before you build
 
-- Success, loading, empty, and error states all render correctly
-- All CRUD operations exist: create, read, update, delete
-- Buttons and forms are disabled during async operations (no duplicate submissions)
-- Every list shows a human-readable empty-state message
-- Changes made directly in Google Sheets are retrievable via the Sync button
-- New env vars are documented in `.env.example`
+Before writing any code, state clearly:
+- What you are about to build
+- What files will be created or modified
+- Any assumptions you are making
+
+If the task is ambiguous, ask all the clarifying questions you need before writing any code. Do not proceed on assumptions that could require significant rework.
+
+### 2. Look for what already exists
+
+Before creating a new component, utility, or installing a new library:
+- Check if the functionality already exists in the codebase
+- Check if Next.js or Tailwind already solves it natively
+- Only introduce new dependencies when nothing existing works
+
+### 3. Build the complete feature, not just the successful case
+
+Every feature must work not only when everything goes right, but also when things go wrong. A feature is incomplete if it only handles the best-case scenario — user fills the form correctly, internet is stable, database responds instantly.
+
+While building, keep these four states in mind at all times:
+
+- **Success state** — the feature works as intended
+- **Loading state** — what the user sees while waiting for data or an operation to complete
+- **Empty state** — what the user sees when there is no data yet
+- **Error state** — what the user sees when something fails (network error, save failed, invalid input)
+
+Do not stop building once the success state works.
+
+### 4. Verify before declaring done
+
+Every feature goes through two gates before it is considered complete.
+
+**Gate 1 — Build Checklist** (run this while building)
+- [ ] Success, loading, empty, and error states are all handled
+- [ ] All applicable CRUD operations exist: create, read, update, delete
+- [ ] No hardcoded credentials or API keys — all secrets go in `.env`
+- [ ] No `console.log` or debug statements left in the code
+- [ ] No placeholder text, dummy data, or "TODO" labels remain in the UI
+
+**Gate 2 — Review Checklist** (run this before declaring the feature done)
+
+Data & Sync
+- [ ] Data loads correctly from the source on page load
+- [ ] Data created, updated, and deleted in the app is correctly reflected in the database
+- [ ] Changes made directly in the database (e.g. Google Sheets) can be retrieved by the app
+- [ ] A manual refresh mechanism exists so the user can pull the latest data on demand
+- [ ] The UI shows when data was last synced
+
+UI Completeness
+- [ ] A main page exists and is the clear entry point of the app
+- [ ] Every page is reachable from the navigation — no orphaned pages
+- [ ] Every interactive element has visible hover, active, and disabled states
+- [ ] A 404 page exists for unmatched routes
+
+States & Feedback
+- [ ] Every list or table shows a clear message when empty — no blank screens
+- [ ] Every async operation has a visible loading indicator
+- [ ] Buttons and forms are disabled during async operations to prevent duplicate submissions
+- [ ] Failed operations show a visible, human-readable error message — no silent failures
+- [ ] Form inputs that fail validation show clear inline feedback before submission
+
+Navigation & Layout
+- [ ] Navigation is consistent — user always knows where they are and can go back
+- [ ] The layout does not break on common screen sizes (mobile, tablet, desktop)
+
+Production Hygiene
+- [ ] Environment variables are documented in `.env.example`
+
+Do not say a feature is complete until both gates are cleared.
+
+### 5. Learn and adapt when things fail
+
+When you hit an error:
+- Read the full error message and trace
+- Identify the root cause, not just the symptom
+- Fix and retest
+- If the fix reveals a pattern worth remembering, note it
+
+Do not apply surface-level fixes that mask the real problem.
+
+### 6. Do not make large changes without confirmation
+
+Do not refactor existing components, change architectural decisions, or restructure folders unless explicitly asked. If you believe a larger change is necessary, propose it first and wait for confirmation.
 
 ---
 
-## Key constraints
+## Universal Standards
 
-- **No test suite** — verification is manual via the running app
-- **No `console.log`** in committed code
-- **Column order in Google Sheets is irrelevant** — always use `buildColumnMap`, never positional index
-- **Do not use `FORMATTED_VALUE`** (the default) — Indonesian locale formats numbers as `"15.623.000"` which breaks `parseFloat`
-- **`app/api/debug-sheet/route.ts`** is a temporary diagnostic endpoint — remove it before any production audit
+### Error Handling
+Every operation that can fail — API calls, database writes, form submissions — must be wrapped in error handling. Errors must surface to the user in plain language. "Something went wrong" is acceptable only as a last resort. Prefer specific messages: "Failed to save. Check your connection and try again."
+
+### Loading States
+Every async operation needs a loading indicator. Buttons that trigger async operations must be disabled while waiting to prevent duplicate submissions. Skeleton loaders are preferred over spinners for data-fetching.
+
+### Empty States
+If a list, table, or data view can be empty, design for it explicitly. Show a message that tells the user why it's empty and what they can do. Never render a blank container.
+
+### CRUD Completeness
+Never implement only the read or create operation and consider a feature done. Every entity in the app that can be created must also be editable and deletable from within the app UI. Delete actions must always include a confirmation prompt.
+
+### Two-Way Sync (Google Sheets backend)
+When using Google Sheets as the database:
+- The app must be able to read fresh data from the sheet on demand, not just on initial load
+- Changes made directly in Google Sheets must be retrievable by the app
+- Include a manual refresh mechanism if real-time sync is not implemented
+- Display a data freshness indicator so the user knows when data was last synced
+
+### Navigation
+Every page must be reachable from the main navigation. There must be a clear home/main page. The user must never reach a dead end with no way back.
+
+---
+
+## Stack Conventions
+
+- **Framework**: Next.js 14 with App Router
+- **Styling**: Tailwind CSS — use utility classes, avoid custom CSS unless necessary
+- **Database**: Google Sheets via `googleapis`
+- **Deployment**: Vercel — ensure all environment variables are documented
+- **API Routes**: Use Next.js route handlers (`app/api/`) for all backend logic
+- **Data Fetching**: Use server components where possible; client components only when interactivity is required
+
+---
+
+## What Not To Do
+
+- Do not skip Project Initialization when starting a new project
+- Do not declare a feature done before clearing both Gate 1 and Gate 2
+- Do not leave error states unhandled or silent
+- Do not hardcode any credentials or API keys
+- Do not install a new library without checking if the existing stack already solves it
 - Do not refactor or restructure existing code without being asked
+- Do not build a feature that creates data without also building the ability to edit and delete it
+- Do not leave `console.log` statements in production code
+- Do not render a blank screen when data is empty or loading
