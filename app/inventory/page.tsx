@@ -1,13 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import type { InventoryItem } from '@/lib/types'
 
-// ─── Modal: Add / Edit ────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtPrice(value: number): string {
   return 'Rp ' + new Intl.NumberFormat('id-ID').format(value)
 }
+
+// ─── Modal: Add / Edit ────────────────────────────────────────────────────────
 
 interface ItemForm {
   itemCode: string
@@ -211,16 +213,43 @@ function DeleteModal({ item, onClose, onConfirm }: DeleteModalProps) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+type SortCol = 'itemCode' | 'partNumber' | 'itemName' | 'brand' | 'basePrice' | 'sellingPrice'
+
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [search, setSearch] = useState('')
   const [lastSynced, setLastSynced] = useState<Date | null>(null)
 
   const [showAdd, setShowAdd] = useState(false)
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [deleteItem, setDeleteItem] = useState<InventoryItem | null>(null)
+
+  // Per-column search
+  const [searchCode, setSearchCode] = useState('')
+  const [searchPart, setSearchPart] = useState('')
+  const [searchName, setSearchName] = useState('')
+  const [searchBrand, setSearchBrand] = useState('')
+
+  // Sorting — default: item code A-Z
+  const [sortCol, setSortCol] = useState<SortCol>('itemCode')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(col: SortCol) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortCol(col)
+      setSortDir('asc')
+    }
+  }
+
+  function sortIcon(col: SortCol) {
+    if (sortCol !== col) return <span className="ml-1 text-gray-300">⇅</span>
+    return sortDir === 'asc'
+      ? <span className="ml-1 text-blue-500">↑</span>
+      : <span className="ml-1 text-blue-500">↓</span>
+  }
 
   const load = useCallback(async () => {
     setError('')
@@ -240,15 +269,28 @@ export default function InventoryPage() {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = items.filter(item => {
-    const q = search.toLowerCase()
-    return (
-      item.itemName.toLowerCase().includes(q) ||
-      item.itemCode.toLowerCase().includes(q) ||
-      item.partNumber.toLowerCase().includes(q) ||
-      item.brand.toLowerCase().includes(q)
+  const filtered = useMemo(() => {
+    const q = {
+      code:  searchCode.toLowerCase(),
+      part:  searchPart.toLowerCase(),
+      name:  searchName.toLowerCase(),
+      brand: searchBrand.toLowerCase(),
+    }
+    let result = items.filter(item =>
+      item.itemCode.toLowerCase().includes(q.code) &&
+      item.partNumber.toLowerCase().includes(q.part) &&
+      item.itemName.toLowerCase().includes(q.name) &&
+      item.brand.toLowerCase().includes(q.brand)
     )
-  })
+    result = [...result].sort((a, b) => {
+      const valA = a[sortCol] ?? ''
+      const valB = b[sortCol] ?? ''
+      if (valA < valB) return sortDir === 'asc' ? -1 : 1
+      if (valA > valB) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+    return result
+  }, [items, searchCode, searchPart, searchName, searchBrand, sortCol, sortDir])
 
   async function handleAdd(form: ItemForm) {
     const res = await fetch('/api/inventory', {
@@ -281,9 +323,11 @@ export default function InventoryPage() {
     await load()
   }
 
+  const thClass = 'px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700'
+
   return (
     <div className="min-h-screen bg-gray-50 pt-20 pb-10 px-4">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -310,13 +354,31 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="mb-4">
+        {/* Per-column search */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search by item name, code, part number, or brand…"
-            className="w-full sm:w-80 text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            value={searchCode}
+            onChange={e => setSearchCode(e.target.value)}
+            placeholder="Item Code…"
+            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            value={searchPart}
+            onChange={e => setSearchPart(e.target.value)}
+            placeholder="Part Number…"
+            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            value={searchName}
+            onChange={e => setSearchName(e.target.value)}
+            placeholder="Item Name…"
+            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            value={searchBrand}
+            onChange={e => setSearchBrand(e.target.value)}
+            placeholder="Brand…"
+            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
@@ -334,7 +396,7 @@ export default function InventoryPage() {
           ) : filtered.length === 0 ? (
             <div className="py-16 text-center">
               <p className="text-sm text-gray-500">
-                {search
+                {(searchCode || searchPart || searchName || searchBrand)
                   ? 'No items match your search.'
                   : 'No inventory items yet. Click "Add Item" to get started.'}
               </p>
@@ -344,12 +406,24 @@ export default function InventoryPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Item Code</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Part Number</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Item Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Base Price</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Selling Price</th>
+                    <th className={`${thClass} text-left`} onClick={() => handleSort('itemCode')}>
+                      Item Code{sortIcon('itemCode')}
+                    </th>
+                    <th className={`${thClass} text-left`} onClick={() => handleSort('partNumber')}>
+                      Part Number{sortIcon('partNumber')}
+                    </th>
+                    <th className={`${thClass} text-left`} onClick={() => handleSort('itemName')}>
+                      Item Name{sortIcon('itemName')}
+                    </th>
+                    <th className={`${thClass} text-left`} onClick={() => handleSort('brand')}>
+                      Brand{sortIcon('brand')}
+                    </th>
+                    <th className={`${thClass} text-right`} onClick={() => handleSort('basePrice')}>
+                      Base Price{sortIcon('basePrice')}
+                    </th>
+                    <th className={`${thClass} text-right`} onClick={() => handleSort('sellingPrice')}>
+                      Selling Price{sortIcon('sellingPrice')}
+                    </th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -387,7 +461,9 @@ export default function InventoryPage() {
         {/* Footer count */}
         {!loading && items.length > 0 && (
           <p className="mt-3 text-xs text-gray-400 text-right">
-            {search ? `${filtered.length} of ${items.length}` : items.length} item{items.length !== 1 ? 's' : ''}
+            {(searchCode || searchPart || searchName || searchBrand)
+              ? `${filtered.length} of ${items.length}`
+              : items.length} item{items.length !== 1 ? 's' : ''}
           </p>
         )}
       </div>

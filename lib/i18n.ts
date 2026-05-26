@@ -12,8 +12,10 @@ export const translations = {
   'home.subtitle':      { en: 'Select a module to get started', id: 'Pilih modul untuk memulai' },
   'home.openReceivables': { en: 'Open AR Tracker',  id: 'Buka Pelacak Piutang' },
   'home.openCanvas':    { en: 'Open Canvas Tracker', id: 'Buka Pelacak Canvas' },
+  'home.openInventory': { en: 'Open Inventory',      id: 'Buka Inventaris' },
   'home.arDesc':        { en: 'Monitor unpaid, partial, and paid customer invoices', id: 'Pantau invoice pelanggan yang belum, sebagian, dan sudah dibayar' },
   'home.canvasDesc':    { en: 'Track sales rep field runs and on-the-spot item sales', id: 'Lacak perjalanan sales dan penjualan item di lapangan' },
+  'home.inventoryDesc': { en: 'Browse, add, and manage spare parts and product inventory', id: 'Lihat, tambah, dan kelola stok suku cadang dan produk' },
 
   // Common actions
   'common.save':        { en: 'Save',             id: 'Simpan' },

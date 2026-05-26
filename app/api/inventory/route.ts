@@ -7,7 +7,8 @@ export async function GET() {
     const { data, error } = await getSupabase()
       .from('inventory')
       .select('*')
-      .order('item_name', { ascending: true })
+      .order('item_code', { ascending: true })
+      .limit(10000)
 
     if (error) throw error
 
