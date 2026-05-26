@@ -238,8 +238,10 @@ export default function InventoryPage() {
   // Pagination
   const PAGE_SIZE = 100
   const [page, setPage] = useState(1)
+  const [pageInput, setPageInput] = useState('1')
 
   useEffect(() => { setPage(1) }, [searchCode, searchPart, searchName, searchBrand, sortCol, sortDir])
+  useEffect(() => { setPageInput(String(page)) }, [page])
 
   function handleSort(col: SortCol) {
     if (sortCol === col) {
@@ -303,6 +305,15 @@ export default function InventoryPage() {
     () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
     [filtered, page, PAGE_SIZE]
   )
+
+  function commitPage(val: string) {
+    const n = parseInt(val, 10)
+    if (!isNaN(n) && n >= 1 && n <= totalPages) {
+      setPage(n)
+    } else {
+      setPageInput(String(page))
+    }
+  }
 
   async function handleAdd(form: ItemForm) {
     const res = await fetch('/api/inventory', {
@@ -473,12 +484,26 @@ export default function InventoryPage() {
         {/* Pagination */}
         {!loading && filtered.length > 0 && (
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4">
-            <p className="text-xs text-gray-400">
+            <span className="text-xs text-gray-400">
               {filtered.length < items.length
                 ? `${filtered.length} of ${items.length} items`
                 : `${items.length} item${items.length !== 1 ? 's' : ''}`}
-              {totalPages > 1 && ` — page ${page} of ${totalPages}`}
-            </p>
+              {totalPages > 1 && (
+                <>
+                  {' — page '}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={pageInput}
+                    onChange={e => setPageInput(e.target.value)}
+                    onBlur={() => commitPage(pageInput)}
+                    onKeyDown={e => { if (e.key === 'Enter') commitPage(pageInput) }}
+                    className="w-10 text-center border border-gray-300 rounded px-1 py-0.5 text-xs mx-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {` of ${totalPages}`}
+                </>
+              )}
+            </span>
             {totalPages > 1 && (
               <div className="flex items-center gap-2">
                 <button
