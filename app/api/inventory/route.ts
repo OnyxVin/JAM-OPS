@@ -12,11 +12,13 @@ export async function GET() {
     if (error) throw error
 
     const items: InventoryItem[] = (data ?? []).map((row) => ({
-      id:         row.id,
-      itemCode:   row.item_code,
-      partNumber: row.part_number,
-      itemName:   row.item_name,
-      brand:      row.brand,
+      id:           row.id,
+      itemCode:     row.item_code,
+      partNumber:   row.part_number,
+      itemName:     row.item_name,
+      brand:        row.brand,
+      basePrice:    Number(row.base_price ?? 0),
+      sellingPrice: Number(row.selling_price ?? 0),
     }))
 
     return NextResponse.json(items)
@@ -29,7 +31,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { itemCode, partNumber, itemName, brand } = body
+    const { itemCode, partNumber, itemName, brand, basePrice, sellingPrice } = body
 
     if (!itemName) {
       return NextResponse.json({ error: 'Item name is required' }, { status: 400 })
@@ -38,10 +40,12 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('inventory')
       .insert({
-        item_code:   String(itemCode ?? ''),
-        part_number: String(partNumber ?? ''),
-        item_name:   String(itemName),
-        brand:       String(brand ?? ''),
+        item_code:     String(itemCode ?? ''),
+        part_number:   String(partNumber ?? ''),
+        item_name:     String(itemName),
+        brand:         String(brand ?? ''),
+        base_price:    Number(basePrice ?? 0),
+        selling_price: Number(sellingPrice ?? 0),
       })
       .select()
       .single()
@@ -49,11 +53,13 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     const item: InventoryItem = {
-      id:         data.id,
-      itemCode:   data.item_code,
-      partNumber: data.part_number,
-      itemName:   data.item_name,
-      brand:      data.brand,
+      id:           data.id,
+      itemCode:     data.item_code,
+      partNumber:   data.part_number,
+      itemName:     data.item_name,
+      brand:        data.brand,
+      basePrice:    Number(data.base_price ?? 0),
+      sellingPrice: Number(data.selling_price ?? 0),
     }
 
     return NextResponse.json(item, { status: 201 })

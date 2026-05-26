@@ -5,14 +5,20 @@ import type { InventoryItem } from '@/lib/types'
 
 // ─── Modal: Add / Edit ────────────────────────────────────────────────────────
 
+function fmtPrice(value: number): string {
+  return 'Rp ' + new Intl.NumberFormat('id-ID').format(value)
+}
+
 interface ItemForm {
   itemCode: string
   partNumber: string
   itemName: string
   brand: string
+  basePrice: string
+  sellingPrice: string
 }
 
-const EMPTY_FORM: ItemForm = { itemCode: '', partNumber: '', itemName: '', brand: '' }
+const EMPTY_FORM: ItemForm = { itemCode: '', partNumber: '', itemName: '', brand: '', basePrice: '', sellingPrice: '' }
 
 interface ItemModalProps {
   mode: 'add' | 'edit'
@@ -98,6 +104,31 @@ function ItemModal({ mode, initial, onClose, onSave }: ItemModalProps) {
               placeholder="e.g. Toyota"
               className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Base Price (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.basePrice}
+                onChange={e => set('basePrice', e.target.value)}
+                placeholder="e.g. 124500"
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Selling Price (Rp)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.sellingPrice}
+                onChange={e => set('sellingPrice', e.target.value)}
+                placeholder="e.g. 145000"
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -317,6 +348,8 @@ export default function InventoryPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Part Number</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Item Name</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Base Price</th>
+                    <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Selling Price</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
@@ -327,6 +360,8 @@ export default function InventoryPage() {
                       <td className="px-4 py-3 text-gray-600 font-mono text-xs">{item.partNumber || '—'}</td>
                       <td className="px-4 py-3 font-medium text-gray-800">{item.itemName}</td>
                       <td className="px-4 py-3 text-gray-600">{item.brand || '—'}</td>
+                      <td className="px-4 py-3 text-right text-gray-600 tabular-nums">{item.basePrice ? fmtPrice(item.basePrice) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-gray-600 tabular-nums">{item.sellingPrice ? fmtPrice(item.sellingPrice) : '—'}</td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <button
                           onClick={() => setEditItem(item)}
@@ -364,7 +399,7 @@ export default function InventoryPage() {
       {editItem && (
         <ItemModal
           mode="edit"
-          initial={{ itemCode: editItem.itemCode, partNumber: editItem.partNumber, itemName: editItem.itemName, brand: editItem.brand }}
+          initial={{ itemCode: editItem.itemCode, partNumber: editItem.partNumber, itemName: editItem.itemName, brand: editItem.brand, basePrice: String(editItem.basePrice || ''), sellingPrice: String(editItem.sellingPrice || '') }}
           onClose={() => setEditItem(null)}
           onSave={handleEdit}
         />

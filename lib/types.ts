@@ -74,6 +74,8 @@ export interface InventoryItem {
   partNumber: string
   itemName: string
   brand: string
+  basePrice: number
+  sellingPrice: number
 }
 
 export interface ARSummary {

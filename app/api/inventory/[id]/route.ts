@@ -7,7 +7,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (isNaN(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
     const body = await request.json()
-    const { itemCode, partNumber, itemName, brand } = body
+    const { itemCode, partNumber, itemName, brand, basePrice, sellingPrice } = body
 
     if (!itemName) {
       return NextResponse.json({ error: 'Item name is required' }, { status: 400 })
@@ -16,10 +16,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const { data, error } = await supabase
       .from('inventory')
       .update({
-        item_code:   String(itemCode ?? ''),
-        part_number: String(partNumber ?? ''),
-        item_name:   String(itemName),
-        brand:       String(brand ?? ''),
+        item_code:     String(itemCode ?? ''),
+        part_number:   String(partNumber ?? ''),
+        item_name:     String(itemName),
+        brand:         String(brand ?? ''),
+        base_price:    Number(basePrice ?? 0),
+        selling_price: Number(sellingPrice ?? 0),
       })
       .eq('id', id)
       .select()
@@ -28,11 +30,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (error) throw error
 
     return NextResponse.json({
-      id:         data.id,
-      itemCode:   data.item_code,
-      partNumber: data.part_number,
-      itemName:   data.item_name,
-      brand:      data.brand,
+      id:           data.id,
+      itemCode:     data.item_code,
+      partNumber:   data.part_number,
+      itemName:     data.item_name,
+      brand:        data.brand,
+      basePrice:    Number(data.base_price ?? 0),
+      sellingPrice: Number(data.selling_price ?? 0),
     })
   } catch (error) {
     console.error('[PUT /api/inventory/[id]]', error)
