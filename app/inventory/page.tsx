@@ -235,6 +235,12 @@ export default function InventoryPage() {
   const [sortCol, setSortCol] = useState<SortCol>('itemCode')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
+  // Pagination
+  const PAGE_SIZE = 100
+  const [page, setPage] = useState(1)
+
+  useEffect(() => { setPage(1) }, [searchCode, searchPart, searchName, searchBrand, sortCol, sortDir])
+
   function handleSort(col: SortCol) {
     if (sortCol === col) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -291,6 +297,12 @@ export default function InventoryPage() {
     })
     return result
   }, [items, searchCode, searchPart, searchName, searchBrand, sortCol, sortDir])
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
+  const paginated = useMemo(
+    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filtered, page, PAGE_SIZE]
+  )
 
   async function handleAdd(form: ItemForm) {
     const res = await fetch('/api/inventory', {
@@ -428,7 +440,7 @@ export default function InventoryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filtered.map(item => (
+                  {paginated.map(item => (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-gray-600 font-mono text-xs">{item.itemCode || '—'}</td>
                       <td className="px-4 py-3 text-gray-600 font-mono text-xs">{item.partNumber || '—'}</td>
@@ -458,13 +470,34 @@ export default function InventoryPage() {
           )}
         </div>
 
-        {/* Footer count */}
-        {!loading && items.length > 0 && (
-          <p className="mt-3 text-xs text-gray-400 text-right">
-            {(searchCode || searchPart || searchName || searchBrand)
-              ? `${filtered.length} of ${items.length}`
-              : items.length} item{items.length !== 1 ? 's' : ''}
-          </p>
+        {/* Pagination */}
+        {!loading && filtered.length > 0 && (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4">
+            <p className="text-xs text-gray-400">
+              {filtered.length < items.length
+                ? `${filtered.length} of ${items.length} items`
+                : `${items.length} item${items.length !== 1 ? 's' : ''}`}
+              {totalPages > 1 && ` — page ${page} of ${totalPages}`}
+            </p>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => p - 1)}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Prev
+                </button>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -4,15 +4,25 @@ import type { InventoryItem } from '@/lib/types'
 
 export async function GET() {
   try {
-    const { data, error } = await getSupabase()
-      .from('inventory')
-      .select('*')
-      .order('item_code', { ascending: true })
-      .limit(10000)
+    const BATCH = 1000
+    const all: any[] = []
+    let from = 0
 
-    if (error) throw error
+    while (true) {
+      const { data, error } = await getSupabase()
+        .from('inventory')
+        .select('*')
+        .order('item_code', { ascending: true })
+        .range(from, from + BATCH - 1)
 
-    const items: InventoryItem[] = (data ?? []).map((row) => ({
+      if (error) throw error
+      if (!data || data.length === 0) break
+      all.push(...data)
+      if (data.length < BATCH) break
+      from += BATCH
+    }
+
+    const items: InventoryItem[] = all.map((row) => ({
       id:           row.id,
       itemCode:     row.item_code,
       partNumber:   row.part_number,
