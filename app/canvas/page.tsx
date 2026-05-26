@@ -75,6 +75,9 @@ function ItemsTable({ run }: { run: CanvasRun }) {
           {run.status === 'Closed' && (
             <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.sold')}</th>
           )}
+          {run.status === 'Closed' && (
+            <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.returned')}</th>
+          )}
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100 bg-white">
@@ -83,7 +86,14 @@ function ItemsTable({ run }: { run: CanvasRun }) {
             <td className="px-3 py-2 text-gray-700">{item.itemName}</td>
             <td className="px-3 py-2 text-center text-gray-600">{item.quantityBrought}</td>
             {run.status === 'Closed' && (
-              <td className="px-3 py-2 text-center font-medium text-blue-700">{item.quantitySold ?? '—'}</td>
+              <td className="px-3 py-2 text-center font-medium text-blue-700">
+                {item.quantitySold !== null ? item.quantitySold : '—'}
+              </td>
+            )}
+            {run.status === 'Closed' && (
+              <td className="px-3 py-2 text-center font-medium text-amber-600">
+                {item.quantityReturned !== null ? item.quantityReturned : '—'}
+              </td>
             )}
           </tr>
         ))}
@@ -100,10 +110,11 @@ interface RunCardProps {
   onToggle: () => void
   onClose?: () => void
   onEdit?: () => void
+  onEditQtys?: () => void
   onDelete?: () => void
 }
 
-function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCardProps) {
+function RunCard({ run, expanded, onToggle, onClose, onEdit, onEditQtys, onDelete }: RunCardProps) {
   const { t } = useLanguage()
 
   return (
@@ -127,6 +138,9 @@ function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCard
           {run.status === 'Closed' && run.totalQuantitySold !== null && (
             <span>{t('canvas.item.sold')}: <span className="text-blue-700 font-medium">{run.totalQuantitySold}</span></span>
           )}
+          {run.status === 'Closed' && run.totalQuantityReturned !== null && run.totalQuantityReturned > 0 && (
+            <span>{t('canvas.item.returned')}: <span className="text-amber-600 font-medium">{run.totalQuantityReturned}</span></span>
+          )}
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {onClose && (
               <button
@@ -134,6 +148,14 @@ function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCard
                 className="px-3 py-1 text-xs font-medium bg-blue-700 text-white rounded hover:bg-blue-800 transition-colors"
               >
                 {t('canvas.closeRun')}
+              </button>
+            )}
+            {onEditQtys && (
+              <button
+                onClick={onEditQtys}
+                className="px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors border border-blue-200"
+              >
+                Edit Qtys
               </button>
             )}
             {onEdit && (
@@ -637,6 +659,9 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
     Object.fromEntries(run.items.map((item) => [item.itemName, '']))
   )
+  const [returnedQtys, setReturnedQtys] = useState<Record<string, string>>(
+    Object.fromEntries(run.items.map((item) => [item.itemName, '']))
+  )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -647,16 +672,14 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
     setSaveError('')
     try {
       const soldItems = run.items.map((item) => ({
-        itemName: item.itemName,
-        quantitySold: soldQtys[item.itemName] ?? '0',
+        itemName:         item.itemName,
+        quantitySold:     soldQtys[item.itemName]     || '0',
+        quantityReturned: returnedQtys[item.itemName] || '0',
       }))
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dateClosed: fromInputDate(dateClosed),
-          soldItems,
-        }),
+        body: JSON.stringify({ dateClosed: fromInputDate(dateClosed), soldItems }),
       })
       if (!res.ok) throw new Error()
       onSaved()
@@ -669,7 +692,7 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
           <div>
             <h2 className="text-base font-semibold">{t('canvas.modal.closeRun.title')}</h2>
@@ -690,23 +713,34 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
 
           <div>
             <p className="text-xs font-medium text-gray-700 mb-2">{t('canvas.modal.closeRun.items')}</p>
+            <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
+              <span />
+              <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
+              <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
+              <span className="text-xs text-amber-600 text-center whitespace-nowrap">{t('canvas.item.returned')}</span>
+            </div>
             <div className="space-y-2">
               {run.items.map((item) => (
-                <div key={item.itemName} className="flex items-center gap-3">
-                  <span className="flex-1 text-sm text-gray-700 truncate">{item.itemName}</span>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {t('canvas.item.brought')}: {item.quantityBrought}
-                  </span>
+                <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center">
+                  <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
+                  <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
                   <input
                     type="number"
                     min="0"
                     max={item.quantityBrought}
-                    className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={t('canvas.modal.newRun.ph.qty')}
+                    className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0"
                     value={soldQtys[item.itemName] ?? ''}
-                    onChange={(e) =>
-                      setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })
-                    }
+                    onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    max={item.quantityBrought}
+                    className="w-20 px-2 py-1.5 border border-amber-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    placeholder="0"
+                    value={returnedQtys[item.itemName] ?? ''}
+                    onChange={(e) => setReturnedQtys({ ...returnedQtys, [item.itemName]: e.target.value })}
                   />
                 </div>
               ))}
@@ -732,6 +766,116 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   )
 }
 
+// ─── Edit Quantities Modal (for already-closed runs) ─────────────────────────
+
+interface EditQuantitiesModalProps {
+  run: CanvasRun
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditQuantitiesModal({ run, onClose, onSaved }: EditQuantitiesModalProps) {
+  const { t } = useLanguage()
+  const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
+    Object.fromEntries(run.items.map((item) => [
+      item.itemName,
+      item.quantitySold !== null ? String(item.quantitySold) : '',
+    ]))
+  )
+  const [returnedQtys, setReturnedQtys] = useState<Record<string, string>>(
+    Object.fromEntries(run.items.map((item) => [
+      item.itemName,
+      item.quantityReturned !== null ? String(item.quantityReturned) : '',
+    ]))
+  )
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setSaveError('')
+    try {
+      const soldItems = run.items.map((item) => ({
+        itemName:         item.itemName,
+        quantitySold:     soldQtys[item.itemName]     || '0',
+        quantityReturned: returnedQtys[item.itemName] || '0',
+      }))
+      const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateClosed: run.dateClosed, soldItems }),
+      })
+      if (!res.ok) throw new Error()
+      onSaved()
+    } catch {
+      setSaveError(t('canvas.saveError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+          <div>
+            <h2 className="text-base font-semibold">Edit Quantities</h2>
+            <p className="text-xs text-gray-500 mt-0.5 font-mono">{run.canvasId}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
+            <span />
+            <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
+            <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
+            <span className="text-xs text-amber-600 text-center whitespace-nowrap">{t('canvas.item.returned')}</span>
+          </div>
+          <div className="space-y-2">
+            {run.items.map((item) => (
+              <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 items-center">
+                <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
+                <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0"
+                  value={soldQtys[item.itemName] ?? ''}
+                  onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  className="w-20 px-2 py-1.5 border border-amber-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="0"
+                  value={returnedQtys[item.itemName] ?? ''}
+                  onChange={(e) => setReturnedQtys({ ...returnedQtys, [item.itemName]: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+
+          {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? t('common.saving') : 'Save Quantities'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CanvasPage() {
@@ -747,6 +891,7 @@ export default function CanvasPage() {
   const [showNewRun, setShowNewRun] = useState(false)
   const [showCloseRun, setShowCloseRun] = useState<CanvasRun | null>(null)
   const [editingRun, setEditingRun] = useState<CanvasRun | null>(null)
+  const [editingQtysRun, setEditingQtysRun] = useState<CanvasRun | null>(null)
   const [deletingRun, setDeletingRun] = useState<CanvasRun | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -829,6 +974,7 @@ export default function CanvasPage() {
     setShowNewRun(false)
     setShowCloseRun(null)
     setEditingRun(null)
+    setEditingQtysRun(null)
     fetchData(true)
   }
 
@@ -1062,6 +1208,7 @@ export default function CanvasPage() {
                       run={run}
                       expanded={expandedRunId === run.canvasId}
                       onToggle={() => toggleRun(run.canvasId)}
+                      onEditQtys={() => setEditingQtysRun(run)}
                       onEdit={() => setEditingRun(run)}
                       onDelete={() => { setDeleteError(''); setDeletingRun(run) }}
                     />
@@ -1085,6 +1232,13 @@ export default function CanvasPage() {
         <EditRunModal
           run={editingRun}
           onClose={() => setEditingRun(null)}
+          onSaved={handleSaved}
+        />
+      )}
+      {editingQtysRun && (
+        <EditQuantitiesModal
+          run={editingQtysRun}
+          onClose={() => setEditingQtysRun(null)}
           onSaved={handleSaved}
         />
       )}
