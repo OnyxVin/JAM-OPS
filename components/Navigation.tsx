@@ -14,6 +14,7 @@ export default function Navigation() {
   const navLinks = [
     { href: '/receivables', label: t('nav.receivables') },
     { href: '/canvas', label: t('nav.canvas') },
+    { href: '/inventory', label: t('nav.inventory') },
   ]
 
   async function handleLogout() {

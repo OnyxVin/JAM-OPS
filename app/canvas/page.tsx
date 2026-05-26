@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
-import type { CanvasRun, CanvasItem } from '@/lib/types'
+import type { CanvasRun, CanvasItem, InventoryItem } from '@/lib/types'
 
 const SALES_REPS = ['Tonny', 'Rudi']
 
@@ -75,6 +75,9 @@ function ItemsTable({ run }: { run: CanvasRun }) {
           {run.status === 'Closed' && (
             <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.sold')}</th>
           )}
+          {run.status === 'Closed' && (
+            <th className="px-3 py-2 text-center text-gray-500 font-semibold">{t('canvas.item.returned')}</th>
+          )}
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100 bg-white">
@@ -83,7 +86,14 @@ function ItemsTable({ run }: { run: CanvasRun }) {
             <td className="px-3 py-2 text-gray-700">{item.itemName}</td>
             <td className="px-3 py-2 text-center text-gray-600">{item.quantityBrought}</td>
             {run.status === 'Closed' && (
-              <td className="px-3 py-2 text-center font-medium text-blue-700">{item.quantitySold ?? '—'}</td>
+              <td className="px-3 py-2 text-center font-medium text-blue-700">
+                {item.quantitySold !== null ? item.quantitySold : '—'}
+              </td>
+            )}
+            {run.status === 'Closed' && (
+              <td className="px-3 py-2 text-center font-medium text-amber-600">
+                {item.quantityReturned !== null ? item.quantityReturned : '—'}
+              </td>
             )}
           </tr>
         ))}
@@ -100,10 +110,11 @@ interface RunCardProps {
   onToggle: () => void
   onClose?: () => void
   onEdit?: () => void
+  onEditQtys?: () => void
   onDelete?: () => void
 }
 
-function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCardProps) {
+function RunCard({ run, expanded, onToggle, onClose, onEdit, onEditQtys, onDelete }: RunCardProps) {
   const { t } = useLanguage()
 
   return (
@@ -127,6 +138,9 @@ function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCard
           {run.status === 'Closed' && run.totalQuantitySold !== null && (
             <span>{t('canvas.item.sold')}: <span className="text-blue-700 font-medium">{run.totalQuantitySold}</span></span>
           )}
+          {run.status === 'Closed' && run.totalQuantityReturned !== null && run.totalQuantityReturned > 0 && (
+            <span>{t('canvas.item.returned')}: <span className="text-amber-600 font-medium">{run.totalQuantityReturned}</span></span>
+          )}
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             {onClose && (
               <button
@@ -134,6 +148,14 @@ function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCard
                 className="px-3 py-1 text-xs font-medium bg-blue-700 text-white rounded hover:bg-blue-800 transition-colors"
               >
                 {t('canvas.closeRun')}
+              </button>
+            )}
+            {onEditQtys && (
+              <button
+                onClick={onEditQtys}
+                className="px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors border border-blue-200"
+              >
+                Edit Qtys
               </button>
             )}
             {onEdit && (
@@ -166,6 +188,95 @@ function RunCard({ run, expanded, onToggle, onClose, onEdit, onDelete }: RunCard
   )
 }
 
+// ─── Item row type + cross-field filtering helpers ───────────────────────────
+
+type NewRunItemRow = {
+  itemCode: string
+  partNumber: string
+  itemName: string
+  brand: string
+  quantityBrought: string
+}
+
+const EMPTY_ITEM_ROW: NewRunItemRow = {
+  itemCode: '', partNumber: '', itemName: '', brand: '', quantityBrought: '',
+}
+
+type ItemField = 'itemCode' | 'partNumber' | 'itemName' | 'brand'
+
+function getFieldOptions(field: ItemField, row: NewRunItemRow, inventory: InventoryItem[]): string[] {
+  return Array.from(new Set(
+    inventory
+      .filter(inv =>
+        (['itemCode', 'partNumber', 'itemName', 'brand'] as ItemField[])
+          .filter(k => k !== field && row[k] !== '')
+          .every(k => inv[k].toLowerCase().includes(row[k].toLowerCase()))
+      )
+      .map(inv => inv[field])
+      .filter(Boolean)
+  )).sort()
+}
+
+function tryAutoFill(row: NewRunItemRow, inventory: InventoryItem[]): NewRunItemRow {
+  const nonEmpty = (['itemCode', 'partNumber', 'itemName', 'brand'] as ItemField[]).filter(k => row[k] !== '')
+  if (nonEmpty.length === 0) return row
+  const matches = inventory.filter(inv =>
+    nonEmpty.every(k => inv[k].toLowerCase().includes(row[k].toLowerCase()))
+  )
+  if (matches.length !== 1) return row
+  const m = matches[0]
+  return {
+    ...row,
+    itemCode:   row.itemCode   || m.itemCode,
+    partNumber: row.partNumber || m.partNumber,
+    itemName:   row.itemName   || m.itemName,
+    brand:      row.brand      || m.brand,
+  }
+}
+
+// ─── Search input with filtered dropdown ─────────────────────────────────────
+
+interface ItemSearchInputProps {
+  value: string
+  options: string[]
+  placeholder?: string
+  onChange: (val: string) => void
+  className?: string
+}
+
+function ItemSearchInput({ value, options, placeholder, onChange, className }: ItemSearchInputProps) {
+  const [open, setOpen] = useState(false)
+  const filtered = options.filter(o => o.toLowerCase().includes(value.toLowerCase()))
+  const showDropdown = open && filtered.length > 0
+
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={placeholder}
+        className={className}
+        autoComplete="off"
+      />
+      {showDropdown && (
+        <ul className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-300 rounded-lg shadow-lg mt-0.5 max-h-44 overflow-y-auto">
+          {filtered.slice(0, 8).map(opt => (
+            <li
+              key={opt}
+              onMouseDown={() => { onChange(opt); setOpen(false) }}
+              className="px-3 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 cursor-pointer"
+            >
+              {opt}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── New Canvas Run Modal ─────────────────────────────────────────────────────
 
 interface NewRunModalProps {
@@ -180,10 +291,18 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
   const [loadingId, setLoadingId] = useState(false)
   const [salesRep, setSalesRep] = useState('')
   const [dateOut, setDateOut] = useState(toInputDate(todayDDMMYYYY()))
-  const [items, setItems] = useState([{ itemName: '', quantityBrought: '' }])
+  const [items, setItems] = useState<NewRunItemRow[]>([{ ...EMPTY_ITEM_ROW }])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+
+  useEffect(() => {
+    fetch('/api/inventory')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setInventory(data))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!idAutoGenerated) return
@@ -199,18 +318,21 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
   }, [dateOut, idAutoGenerated])
 
   function addItem() {
-    setItems([...items, { itemName: '', quantityBrought: '' }])
+    setItems(prev => [...prev, { ...EMPTY_ITEM_ROW }])
   }
 
   function removeItem(index: number) {
     if (items.length <= 1) return
-    setItems(items.filter((_, i) => i !== index))
+    setItems(prev => prev.filter((_, i) => i !== index))
   }
 
-  function updateItem(index: number, field: 'itemName' | 'quantityBrought', value: string) {
-    const updated = [...items]
-    updated[index] = { ...updated[index], [field]: value }
-    setItems(updated)
+  function updateItemField(index: number, field: keyof NewRunItemRow, value: string) {
+    setItems(prev => {
+      const updated = [...prev]
+      const updatedRow = { ...updated[index], [field]: value }
+      updated[index] = field !== 'quantityBrought' ? tryAutoFill(updatedRow, inventory) : updatedRow
+      return updated
+    })
   }
 
   function validate() {
@@ -251,10 +373,12 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
     }
   }
 
+  const inputCls = 'w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
           <h2 className="text-base font-semibold">{t('canvas.modal.newRun.title')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
@@ -263,16 +387,12 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">{t('canvas.modal.newRun.salesRep')}</label>
               <select
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.salesRep ? 'border-red-400' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.salesRep ? 'border-red-400' : 'border-gray-300'}`}
                 value={salesRep}
                 onChange={(e) => setSalesRep(e.target.value)}
               >
                 <option value="">{t('canvas.modal.newRun.selectRep')}</option>
-                {SALES_REPS.map((rep) => (
-                  <option key={rep} value={rep}>{rep}</option>
-                ))}
+                {SALES_REPS.map((rep) => <option key={rep} value={rep}>{rep}</option>)}
               </select>
               {errors.salesRep && <p className="text-xs text-red-500 mt-1">{errors.salesRep}</p>}
             </div>
@@ -280,9 +400,7 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
               <label className="block text-xs font-medium text-gray-700 mb-1">{t('canvas.modal.newRun.dateOut')}</label>
               <input
                 type="date"
-                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.dateOut ? 'border-red-400' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.dateOut ? 'border-red-400' : 'border-gray-300'}`}
                 value={dateOut}
                 onChange={(e) => setDateOut(e.target.value)}
               />
@@ -293,7 +411,7 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">{t('canvas.col.canvasId')}</label>
             <input
-              className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300`}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder={loadingId ? t('common.generating') : 'CVS2605001'}
               value={canvasId}
               onChange={(e) => { setIdAutoGenerated(false); setCanvasId(e.target.value) }}
@@ -303,40 +421,69 @@ function NewRunModal({ onClose, onSaved }: NewRunModalProps) {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-medium text-gray-700">{t('canvas.modal.newRun.items')}</label>
-              <button
-                type="button"
-                onClick={addItem}
-                className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-              >
+              <button type="button" onClick={addItem} className="text-xs text-blue-600 hover:text-blue-800 font-medium">
                 + {t('canvas.item.addRow')}
               </button>
             </div>
+
+            {/* Column headers */}
+            <div className="grid grid-cols-[1fr_1.1fr_1.5fr_1fr_56px_20px] gap-1.5 mb-1 px-0.5">
+              <span className="text-xs text-gray-400">Item Code</span>
+              <span className="text-xs text-gray-400">Part Number</span>
+              <span className="text-xs text-gray-400">Item Name *</span>
+              <span className="text-xs text-gray-400">Brand</span>
+              <span className="text-xs text-gray-400">Qty</span>
+              <span />
+            </div>
+
             <div className="space-y-2">
               {items.map((item, index) => (
-                <div key={index} className="flex gap-2 items-start">
-                  <input
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={t('canvas.modal.newRun.ph.item')}
+                <div key={index} className="grid grid-cols-[1fr_1.1fr_1.5fr_1fr_56px_20px] gap-1.5 items-start">
+                  <ItemSearchInput
+                    value={item.itemCode}
+                    options={getFieldOptions('itemCode', item, inventory)}
+                    placeholder="Code"
+                    onChange={v => updateItemField(index, 'itemCode', v)}
+                    className={inputCls}
+                  />
+                  <ItemSearchInput
+                    value={item.partNumber}
+                    options={getFieldOptions('partNumber', item, inventory)}
+                    placeholder="Part #"
+                    onChange={v => updateItemField(index, 'partNumber', v)}
+                    className={inputCls}
+                  />
+                  <ItemSearchInput
                     value={item.itemName}
-                    onChange={(e) => updateItem(index, 'itemName', e.target.value)}
+                    options={getFieldOptions('itemName', item, inventory)}
+                    placeholder="Name"
+                    onChange={v => updateItemField(index, 'itemName', v)}
+                    className={inputCls}
+                  />
+                  <ItemSearchInput
+                    value={item.brand}
+                    options={getFieldOptions('brand', item, inventory)}
+                    placeholder="Brand"
+                    onChange={v => updateItemField(index, 'brand', v)}
+                    className={inputCls}
                   />
                   <input
                     type="number"
                     min="1"
-                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={t('canvas.modal.newRun.ph.qty')}
                     value={item.quantityBrought}
-                    onChange={(e) => updateItem(index, 'quantityBrought', e.target.value)}
+                    onChange={e => updateItemField(index, 'quantityBrought', e.target.value)}
+                    placeholder="Qty"
+                    className={inputCls}
                   />
-                  {items.length > 1 && (
+                  {items.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => removeItem(index)}
-                      className="px-2 py-2 text-gray-400 hover:text-red-500 transition-colors text-base leading-none"
+                      className="text-gray-400 hover:text-red-500 transition-colors text-base leading-none pt-1.5 text-center"
                     >
                       ×
                     </button>
-                  )}
+                  ) : <span />}
                 </div>
               ))}
             </div>
@@ -521,17 +668,19 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
     setSaving(true)
     setSaveError('')
     try {
-      const soldItems = run.items.map((item) => ({
-        itemName: item.itemName,
-        quantitySold: soldQtys[item.itemName] ?? '0',
-      }))
+      const soldItems = run.items.map((item) => {
+        const sold = parseInt(soldQtys[item.itemName] || '0') || 0
+        const returned = item.quantityBrought - sold
+        return {
+          itemName:         item.itemName,
+          quantitySold:     String(sold),
+          quantityReturned: String(returned >= 0 ? returned : 0),
+        }
+      })
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dateClosed: fromInputDate(dateClosed),
-          soldItems,
-        }),
+        body: JSON.stringify({ dateClosed: fromInputDate(dateClosed), soldItems }),
       })
       if (!res.ok) throw new Error()
       onSaved()
@@ -544,7 +693,7 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
           <div>
             <h2 className="text-base font-semibold">{t('canvas.modal.closeRun.title')}</h2>
@@ -565,23 +714,24 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
 
           <div>
             <p className="text-xs font-medium text-gray-700 mb-2">{t('canvas.modal.closeRun.items')}</p>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
+              <span />
+              <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
+              <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
+            </div>
             <div className="space-y-2">
               {run.items.map((item) => (
-                <div key={item.itemName} className="flex items-center gap-3">
-                  <span className="flex-1 text-sm text-gray-700 truncate">{item.itemName}</span>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {t('canvas.item.brought')}: {item.quantityBrought}
-                  </span>
+                <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center">
+                  <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
+                  <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
                   <input
                     type="number"
                     min="0"
                     max={item.quantityBrought}
-                    className="w-20 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder={t('canvas.modal.newRun.ph.qty')}
+                    className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="0"
                     value={soldQtys[item.itemName] ?? ''}
-                    onChange={(e) =>
-                      setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })
-                    }
+                    onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
                   />
                 </div>
               ))}
@@ -607,6 +757,106 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   )
 }
 
+// ─── Edit Quantities Modal (for already-closed runs) ─────────────────────────
+
+interface EditQuantitiesModalProps {
+  run: CanvasRun
+  onClose: () => void
+  onSaved: () => void
+}
+
+function EditQuantitiesModal({ run, onClose, onSaved }: EditQuantitiesModalProps) {
+  const { t } = useLanguage()
+  const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
+    Object.fromEntries(run.items.map((item) => [
+      item.itemName,
+      item.quantitySold !== null ? String(item.quantitySold) : '',
+    ]))
+  )
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setSaveError('')
+    try {
+      const soldItems = run.items.map((item) => {
+        const sold = parseInt(soldQtys[item.itemName] || '0') || 0
+        const returned = item.quantityBrought - sold
+        return {
+          itemName:         item.itemName,
+          quantitySold:     String(sold),
+          quantityReturned: String(returned >= 0 ? returned : 0),
+        }
+      })
+      const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dateClosed: run.dateClosed, soldItems }),
+      })
+      if (!res.ok) throw new Error()
+      onSaved()
+    } catch {
+      setSaveError(t('canvas.saveError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+          <div>
+            <h2 className="text-base font-semibold">Edit Quantities</h2>
+            <p className="text-xs text-gray-500 mt-0.5 font-mono">{run.canvasId}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+          <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
+            <span />
+            <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
+            <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
+          </div>
+          <div className="space-y-2">
+            {run.items.map((item) => (
+              <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center">
+                <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
+                <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={item.quantityBrought}
+                  className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="0"
+                  value={soldQtys[item.itemName] ?? ''}
+                  onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
+                />
+              </div>
+            ))}
+          </div>
+
+          {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors">
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {saving ? t('common.saving') : 'Save Quantities'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CanvasPage() {
@@ -622,6 +872,7 @@ export default function CanvasPage() {
   const [showNewRun, setShowNewRun] = useState(false)
   const [showCloseRun, setShowCloseRun] = useState<CanvasRun | null>(null)
   const [editingRun, setEditingRun] = useState<CanvasRun | null>(null)
+  const [editingQtysRun, setEditingQtysRun] = useState<CanvasRun | null>(null)
   const [deletingRun, setDeletingRun] = useState<CanvasRun | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
@@ -704,6 +955,7 @@ export default function CanvasPage() {
     setShowNewRun(false)
     setShowCloseRun(null)
     setEditingRun(null)
+    setEditingQtysRun(null)
     fetchData(true)
   }
 
@@ -937,6 +1189,7 @@ export default function CanvasPage() {
                       run={run}
                       expanded={expandedRunId === run.canvasId}
                       onToggle={() => toggleRun(run.canvasId)}
+                      onEditQtys={() => setEditingQtysRun(run)}
                       onEdit={() => setEditingRun(run)}
                       onDelete={() => { setDeleteError(''); setDeletingRun(run) }}
                     />
@@ -960,6 +1213,13 @@ export default function CanvasPage() {
         <EditRunModal
           run={editingRun}
           onClose={() => setEditingRun(null)}
+          onSaved={handleSaved}
+        />
+      )}
+      {editingQtysRun && (
+        <EditQuantitiesModal
+          run={editingQtysRun}
+          onClose={() => setEditingQtysRun(null)}
           onSaved={handleSaved}
         />
       )}

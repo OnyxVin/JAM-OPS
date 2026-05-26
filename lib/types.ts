@@ -34,6 +34,7 @@ export interface CanvasItemRow {
   brand: string
   quantityBrought: string
   quantitySold: string
+  quantityReturned: string
 }
 
 export interface Payment {
@@ -60,12 +61,24 @@ export interface CanvasItem {
   brand: string
   quantityBrought: number
   quantitySold: number | null
+  quantityReturned: number | null
 }
 
 export interface CanvasRun extends CanvasRunRow {
   items: CanvasItem[]
   totalQuantityBrought: number
   totalQuantitySold: number | null
+  totalQuantityReturned: number | null
+}
+
+export interface InventoryItem {
+  id: number
+  itemCode: string
+  partNumber: string
+  itemName: string
+  brand: string
+  basePrice: number
+  sellingPrice: number
 }
 
 export interface ARSummary {

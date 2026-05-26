@@ -23,9 +23,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     await createCanvasItems(
-      items.map((item: { itemName: string; quantityBrought: string }) => ({
+      items.map((item: { itemCode?: string; partNumber?: string; itemName: string; brand?: string; quantityBrought: string }) => ({
         canvasId,
-        itemName: String(item.itemName),
+        itemCode:        String(item.itemCode ?? ''),
+        partNumber:      String(item.partNumber ?? ''),
+        itemName:        String(item.itemName),
+        brand:           String(item.brand ?? ''),
         quantityBrought: String(item.quantityBrought),
       }))
     )
@@ -103,9 +106,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     await closeCanvasRun(run.rowIndex, String(dateClosed))
     await updateCanvasItemsSold(
       canvasId,
-      soldItems.map((item: { itemName: string; quantitySold: string }) => ({
-        itemName: String(item.itemName),
-        quantitySold: String(item.quantitySold),
+      soldItems.map((item: { itemName: string; quantitySold: string; quantityReturned?: string }) => ({
+        itemName:         String(item.itemName),
+        quantitySold:     String(item.quantitySold),
+        quantityReturned: item.quantityReturned != null ? String(item.quantityReturned) : undefined,
       }))
     )
 

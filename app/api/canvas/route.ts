@@ -14,19 +14,23 @@ export async function GET() {
         .filter((item) => item.canvasId === run.canvasId)
         .map((item) => {
           const quantityBrought = parseInt(item.quantityBrought) || 0
-          const quantitySold =
-            run.status === 'Closed' && item.quantitySold !== ''
-              ? parseInt(item.quantitySold) || 0
-              : null
+          const isClosed = run.status === 'Closed'
+          const quantitySold = isClosed && item.quantitySold !== ''
+            ? parseInt(item.quantitySold) || 0
+            : null
+          const quantityReturned = isClosed && item.quantityReturned !== ''
+            ? parseInt(item.quantityReturned) || 0
+            : null
 
           return {
-            canvasId:    item.canvasId,
-            itemCode:    item.itemCode,
-            partNumber:  item.partNumber,
-            itemName:    item.itemName,
-            brand:       item.brand,
+            canvasId:         item.canvasId,
+            itemCode:         item.itemCode,
+            partNumber:       item.partNumber,
+            itemName:         item.itemName,
+            brand:            item.brand,
             quantityBrought,
             quantitySold,
+            quantityReturned,
           }
         })
 
@@ -38,12 +42,17 @@ export async function GET() {
         run.status === 'Closed'
           ? matchingItems.reduce((sum, i) => sum + (i.quantitySold ?? 0), 0)
           : null
+      const totalQuantityReturned =
+        run.status === 'Closed'
+          ? matchingItems.reduce((sum, i) => sum + (i.quantityReturned ?? 0), 0)
+          : null
 
       return {
         ...run,
         items: matchingItems,
         totalQuantityBrought,
         totalQuantitySold,
+        totalQuantityReturned,
       }
     })
 
@@ -73,9 +82,12 @@ export async function POST(request: NextRequest) {
 
     await createCanvasRun({ canvasId, salesRepName: String(salesRepName), dateOut: String(dateOut) })
     await createCanvasItems(
-      items.map((item: { itemName: string; quantityBrought: string }) => ({
+      items.map((item: { itemCode?: string; partNumber?: string; itemName: string; brand?: string; quantityBrought: string }) => ({
         canvasId,
-        itemName: String(item.itemName),
+        itemCode:        String(item.itemCode ?? ''),
+        partNumber:      String(item.partNumber ?? ''),
+        itemName:        String(item.itemName),
+        brand:           String(item.brand ?? ''),
         quantityBrought: String(item.quantityBrought),
       }))
     )
