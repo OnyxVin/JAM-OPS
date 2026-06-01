@@ -182,6 +182,50 @@ export const translations = {
   'notFound.title':     { en: 'Page Not Found',    id: 'Halaman Tidak Ditemukan' },
   'notFound.message':   { en: 'The page you are looking for does not exist.', id: 'Halaman yang Anda cari tidak ada.' },
   'notFound.home':      { en: 'Back to Home',      id: 'Kembali ke Beranda' },
+
+  // ── Print pages — common ──────────────────────────────────────────────────────
+  'print.btn.print':           { en: '🖨 Print',                                           id: '🖨 Cetak' },
+  'print.btn.close':           { en: '← Close',                                            id: '← Tutup' },
+
+  // Canvas print page
+  'print.canvas.title':        { en: 'Canvas Run Sheet',                                   id: 'Lembar Canvas Run' },
+  'print.canvas.totalItems':   { en: 'Total Items',                                        id: 'Total Item' },
+  'print.canvas.itemCode':     { en: 'Item Code',                                          id: 'Kode Item' },
+  'print.canvas.partNo':       { en: 'Part No.',                                           id: 'No. Part' },
+  'print.canvas.brand':        { en: 'Brand',                                              id: 'Merek' },
+  'print.canvas.total':        { en: 'TOTAL',                                              id: 'TOTAL' },
+  'print.canvas.sigReceived':  { en: 'Received / Checked By',                              id: 'Diterima / Diperiksa Oleh' },
+  'print.canvas.sigName':      { en: 'Name:',                                              id: 'Nama:' },
+  'print.canvas.sigDate':      { en: 'Date:',                                              id: 'Tanggal:' },
+  'print.canvas.reviewMsg':    { en: 'Review the run sheet below before printing.',        id: 'Periksa lembar canvas di bawah sebelum mencetak.' },
+  'print.canvas.loading':      { en: 'Loading run sheet…',                                 id: 'Memuat lembar run…' },
+  'print.canvas.notFound':     { en: 'Canvas run not found or already closed.',            id: 'Canvas run tidak ditemukan atau sudah selesai.' },
+  'print.canvas.loadError':    { en: 'Failed to load canvas data. Please close and try again.', id: 'Gagal memuat data canvas. Tutup dan coba lagi.' },
+
+  // AR print page
+  'print.ar.reportTitle':      { en: 'JAM OPS — Accounts Receivable Report',               id: 'JAM OPS — Laporan Piutang Dagang' },
+  'print.ar.period':           { en: 'Period:',                                             id: 'Periode:' },
+  'print.ar.generated':        { en: 'Generated:',                                         id: 'Dicetak:' },
+  'print.ar.sections':         { en: 'Sections:',                                          id: 'Bagian:' },
+  'print.ar.dueSection':       { en: 'Invoices Due in Period',                             id: 'Invoice Jatuh Tempo dalam Periode' },
+  'print.ar.issuedSection':    { en: 'Invoices Issued in Period',                          id: 'Invoice Terbit dalam Periode' },
+  'print.ar.paidSection':      { en: 'Invoices Paid in Period',                            id: 'Invoice Terbayar dalam Periode' },
+  'print.ar.noInvoices':       { en: 'No invoices found for this period.',                 id: 'Tidak ada invoice untuk periode ini.' },
+  'print.ar.paymentDate':      { en: 'Payment Date',                                       id: 'Tanggal Pembayaran' },
+  'print.ar.reviewMsg':        { en: 'Review the report below before printing.',           id: 'Periksa laporan di bawah sebelum mencetak.' },
+  'print.ar.loading':          { en: 'Loading report…',                                    id: 'Memuat laporan…' },
+  'print.ar.loadError':        { en: 'Failed to load data. Please close and try again.',   id: 'Gagal memuat data. Tutup dan coba lagi.' },
+
+  // AR Print Config Modal
+  'print.ar.modal.title':      { en: 'Print AR Report',                                    id: 'Cetak Laporan Piutang' },
+  'print.ar.modal.from':       { en: 'From',                                               id: 'Dari' },
+  'print.ar.modal.to':         { en: 'To',                                                 id: 'Sampai' },
+  'print.ar.modal.sections':   { en: 'Include Sections',                                   id: 'Bagian yang Disertakan' },
+  'print.ar.modal.dueLabel':   { en: 'Invoices due in this period',                        id: 'Invoice jatuh tempo dalam periode' },
+  'print.ar.modal.issuedLabel':{ en: 'Invoices issued in this period',                     id: 'Invoice terbit dalam periode' },
+  'print.ar.modal.paidLabel':  { en: 'Invoices paid in this period',                       id: 'Invoice terbayar dalam periode' },
+  'print.ar.modal.generate':   { en: 'Generate Report',                                    id: 'Buat Laporan' },
+  'print.ar.modal.printBtn':   { en: '🖨 Print Report',                                    id: '🖨 Cetak Laporan' },
 } as const
 
 export type TranslationKey = keyof typeof translations

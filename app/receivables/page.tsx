@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Fragment, useMemo } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
+import PrintPreviewModal from '@/components/PrintPreviewModal'
 import type { Invoice, ARSummary } from '@/lib/types'
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -586,6 +587,100 @@ function DeleteConfirmModal({ invoice, isDeleting, deleteError, onClose, onConfi
   )
 }
 
+// ─── Print config modal ───────────────────────────────────────────────────────
+
+function PrintConfigModal({ onClose, onGenerate }: { onClose: () => void; onGenerate: (url: string) => void }) {
+  const { t } = useLanguage()
+  const now = new Date()
+  const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const defaultTo   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const [fromDate, setFromDate] = useState(defaultFrom)
+  const [toDate, setToDate]     = useState(defaultTo)
+  const [sections, setSections] = useState({ due: true, issued: true, paid: true })
+
+  function toggle(key: keyof typeof sections) {
+    setSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function generate() {
+    const s = Object.entries(sections).filter(([, v]) => v).map(([k]) => k).join(',')
+    if (!s || !fromDate || !toDate) return
+    onGenerate(`/receivables/print?from=${fromDate}&to=${toDate}&sections=${s}&preview=1`)
+  }
+
+  const canGenerate = Object.values(sections).some(Boolean) && fromDate && toDate
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-900">{t('print.ar.modal.title')}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <div className="px-6 py-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('print.ar.modal.from')}</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('print.ar.modal.to')}</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-2">{t('print.ar.modal.sections')}</p>
+            <div className="space-y-2">
+              {([
+                { key: 'due',    label: t('print.ar.modal.dueLabel') },
+                { key: 'issued', label: t('print.ar.modal.issuedLabel') },
+                { key: 'paid',   label: t('print.ar.modal.paidLabel') },
+              ] as const).map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sections[key]}
+                    onChange={() => toggle(key)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 px-6 pb-5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            onClick={generate}
+            disabled={!canGenerate}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {t('print.ar.modal.generate')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ReceivablesPage() {
@@ -603,6 +698,8 @@ export default function ReceivablesPage() {
   const [deletingInvoice, setDeletingInvoice] = useState<Invoice | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [showPrintConfig, setShowPrintConfig] = useState(false)
+  const [printPreviewUrl, setPrintPreviewUrl] = useState<string | null>(null)
 
   // ─── Search & filter state ────────────────────────────────────────────────
   const [searchScope, setSearchScope] = useState<'all' | 'code' | 'customer'>('all')
@@ -794,6 +891,12 @@ export default function ReceivablesPage() {
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50 transition-colors"
           >
             {syncing ? t('common.syncing') : t('common.sync')}
+          </button>
+          <button
+            onClick={() => setShowPrintConfig(true)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-700 transition-colors"
+          >
+            {t('print.ar.modal.printBtn')}
           </button>
           <button
             onClick={() => setShowAddInvoice(true)}
@@ -1074,6 +1177,19 @@ export default function ReceivablesPage() {
         )}
       </div>
 
+      {showPrintConfig && (
+        <PrintConfigModal
+          onClose={() => setShowPrintConfig(false)}
+          onGenerate={(url) => { setShowPrintConfig(false); setPrintPreviewUrl(url) }}
+        />
+      )}
+      {printPreviewUrl && (
+        <PrintPreviewModal
+          url={printPreviewUrl}
+          title={t('print.ar.reportTitle')}
+          onClose={() => setPrintPreviewUrl(null)}
+        />
+      )}
       {showAddInvoice && (
         <AddInvoiceModal onClose={() => setShowAddInvoice(false)} onSaved={handleSaved} />
       )}
