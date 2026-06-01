@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useLanguage } from '@/lib/LanguageContext'
 import type { CanvasRun } from '@/lib/types'
 
-export default function CanvasPrintPage() {
-  const params = useParams()
-  const id = params.id as string
-  const { t } = useLanguage()
+function CanvasPrintContent({ id }: { id: string }) {
+  const sp      = useSearchParams()
+  const preview = sp.get('preview') === '1'
+  const { t }   = useLanguage()
 
-  const [run, setRun]         = useState<CanvasRun | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  const [run, setRun]             = useState<CanvasRun | null>(null)
+  const [loading, setLoading]     = useState(true)
+  const [notFound, setNotFound]   = useState(false)
   const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
@@ -40,24 +40,26 @@ export default function CanvasPrintPage() {
   return (
     <div className="max-w-4xl mx-auto px-8 py-6 font-sans text-gray-900">
 
-      {/* Controls — hidden when printing */}
-      <div className="print:hidden flex items-center gap-3 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
-        >
-          {t('print.btn.print')}
-        </button>
-        <button
-          onClick={() => window.close()}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          {t('print.btn.close')}
-        </button>
-        <span className="text-xs text-gray-400 ml-2">
-          {t('print.canvas.reviewMsg')}
-        </span>
-      </div>
+      {/* Controls — hidden when in preview mode or when printing */}
+      {!preview && (
+        <div className="print:hidden flex items-center gap-3 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <button
+            onClick={() => window.print()}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
+          >
+            {t('print.btn.print')}
+          </button>
+          <button
+            onClick={() => window.close()}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            {t('print.btn.close')}
+          </button>
+          <span className="text-xs text-gray-400 ml-2">
+            {t('print.canvas.reviewMsg')}
+          </span>
+        </div>
+      )}
 
       {/* Run header */}
       <div className="mb-6 border-b-2 border-gray-900 pb-4">
@@ -138,5 +140,15 @@ export default function CanvasPrintPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function CanvasPrintPage() {
+  const params = useParams()
+  const id = params.id as string
+  return (
+    <Suspense fallback={<div className="p-12 text-center text-gray-400 text-sm">Loading…</div>}>
+      <CanvasPrintContent id={id} />
+    </Suspense>
   )
 }

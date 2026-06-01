@@ -130,8 +130,9 @@ function SectionTable({
 
 function PrintContent() {
   const sp       = useSearchParams()
-  const from     = sp.get('from') ?? ''
-  const to       = sp.get('to')   ?? ''
+  const from     = sp.get('from')    ?? ''
+  const to       = sp.get('to')      ?? ''
+  const preview  = sp.get('preview') === '1'
   const sections = new Set((sp.get('sections') ?? 'due,issued,paid').split(',').filter(Boolean))
 
   const { t } = useLanguage()
@@ -179,24 +180,26 @@ function PrintContent() {
   return (
     <div className="max-w-5xl mx-auto px-8 py-6 font-sans text-gray-900">
 
-      {/* Controls — hidden when printing */}
-      <div className="print:hidden flex items-center gap-3 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-        <button
-          onClick={() => window.print()}
-          className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
-        >
-          {t('print.btn.print')}
-        </button>
-        <button
-          onClick={() => window.close()}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          {t('print.btn.close')}
-        </button>
-        <span className="text-xs text-gray-400 ml-2">
-          {t('print.ar.reviewMsg')}
-        </span>
-      </div>
+      {/* Controls — hidden when in preview mode or when printing */}
+      {!preview && (
+        <div className="print:hidden flex items-center gap-3 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <button
+            onClick={() => window.print()}
+            className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors"
+          >
+            {t('print.btn.print')}
+          </button>
+          <button
+            onClick={() => window.close()}
+            className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            {t('print.btn.close')}
+          </button>
+          <span className="text-xs text-gray-400 ml-2">
+            {t('print.ar.reviewMsg')}
+          </span>
+        </div>
+      )}
 
       {/* Report header */}
       <div className="mb-8 border-b-2 border-gray-900 pb-4">

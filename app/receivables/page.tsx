@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Fragment, useMemo } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
+import PrintPreviewModal from '@/components/PrintPreviewModal'
 import type { Invoice, ARSummary } from '@/lib/types'
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
@@ -588,7 +589,7 @@ function DeleteConfirmModal({ invoice, isDeleting, deleteError, onClose, onConfi
 
 // ─── Print config modal ───────────────────────────────────────────────────────
 
-function PrintConfigModal({ onClose }: { onClose: () => void }) {
+function PrintConfigModal({ onClose, onGenerate }: { onClose: () => void; onGenerate: (url: string) => void }) {
   const { t } = useLanguage()
   const now = new Date()
   const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
@@ -604,8 +605,7 @@ function PrintConfigModal({ onClose }: { onClose: () => void }) {
   function generate() {
     const s = Object.entries(sections).filter(([, v]) => v).map(([k]) => k).join(',')
     if (!s || !fromDate || !toDate) return
-    window.open(`/receivables/print?from=${fromDate}&to=${toDate}&sections=${s}`, '_blank')
-    onClose()
+    onGenerate(`/receivables/print?from=${fromDate}&to=${toDate}&sections=${s}&preview=1`)
   }
 
   const canGenerate = Object.values(sections).some(Boolean) && fromDate && toDate
@@ -699,6 +699,7 @@ export default function ReceivablesPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [showPrintConfig, setShowPrintConfig] = useState(false)
+  const [printPreviewUrl, setPrintPreviewUrl] = useState<string | null>(null)
 
   // ─── Search & filter state ────────────────────────────────────────────────
   const [searchScope, setSearchScope] = useState<'all' | 'code' | 'customer'>('all')
@@ -1177,7 +1178,17 @@ export default function ReceivablesPage() {
       </div>
 
       {showPrintConfig && (
-        <PrintConfigModal onClose={() => setShowPrintConfig(false)} />
+        <PrintConfigModal
+          onClose={() => setShowPrintConfig(false)}
+          onGenerate={(url) => { setShowPrintConfig(false); setPrintPreviewUrl(url) }}
+        />
+      )}
+      {printPreviewUrl && (
+        <PrintPreviewModal
+          url={printPreviewUrl}
+          title={t('print.ar.reportTitle')}
+          onClose={() => setPrintPreviewUrl(null)}
+        />
       )}
       {showAddInvoice && (
         <AddInvoiceModal onClose={() => setShowAddInvoice(false)} onSaved={handleSaved} />

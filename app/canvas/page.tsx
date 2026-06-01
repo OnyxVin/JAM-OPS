@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
+import PrintPreviewModal from '@/components/PrintPreviewModal'
 import type { CanvasRun, CanvasItem, InventoryItem } from '@/lib/types'
 
 const SALES_REPS = ['Tonny', 'Rudi']
@@ -885,6 +886,7 @@ export default function CanvasPage() {
   const [deletingRun, setDeletingRun] = useState<CanvasRun | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [printPreviewUrl, setPrintPreviewUrl] = useState<string | null>(null)
 
   // ─── Search & filter state ────────────────────────────────────────────────
   const [searchScope, setSearchScope] = useState<'all' | 'id' | 'rep'>('all')
@@ -1161,7 +1163,7 @@ export default function CanvasPage() {
                     onToggle={() => toggleRun(run.canvasId)}
                     onClose={() => setShowCloseRun(run)}
                     onEdit={() => setEditingRun(run)}
-                    onPrint={() => window.open(`/canvas/${encodeURIComponent(run.canvasId)}/print`, '_blank')}
+                    onPrint={() => setPrintPreviewUrl(`/canvas/${encodeURIComponent(run.canvasId)}/print?preview=1`)}
                     onDelete={() => { setDeleteError(''); setDeletingRun(run) }}
                   />
                 ))}
@@ -1240,6 +1242,13 @@ export default function CanvasPage() {
           deleteError={deleteError}
           onClose={() => setDeletingRun(null)}
           onConfirm={handleDeleteConfirm}
+        />
+      )}
+      {printPreviewUrl && (
+        <PrintPreviewModal
+          url={printPreviewUrl}
+          title={t('print.canvas.title')}
+          onClose={() => setPrintPreviewUrl(null)}
         />
       )}
     </div>
