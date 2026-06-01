@@ -589,9 +589,12 @@ function DeleteConfirmModal({ invoice, isDeleting, deleteError, onClose, onConfi
 // ─── Print config modal ───────────────────────────────────────────────────────
 
 function PrintConfigModal({ onClose }: { onClose: () => void }) {
+  const { t } = useLanguage()
   const now = new Date()
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const [month, setMonth] = useState(defaultMonth)
+  const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const defaultTo   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const [fromDate, setFromDate] = useState(defaultFrom)
+  const [toDate, setToDate]     = useState(defaultTo)
   const [sections, setSections] = useState({ due: true, issued: true, paid: true })
 
   function toggle(key: keyof typeof sections) {
@@ -600,37 +603,48 @@ function PrintConfigModal({ onClose }: { onClose: () => void }) {
 
   function generate() {
     const s = Object.entries(sections).filter(([, v]) => v).map(([k]) => k).join(',')
-    if (!s) return
-    window.open(`/receivables/print?month=${month}&sections=${s}`, '_blank')
+    if (!s || !fromDate || !toDate) return
+    window.open(`/receivables/print?from=${fromDate}&to=${toDate}&sections=${s}`, '_blank')
     onClose()
   }
 
-  const canGenerate = Object.values(sections).some(Boolean) && month
+  const canGenerate = Object.values(sections).some(Boolean) && fromDate && toDate
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-base font-semibold text-gray-900">Print AR Report</h2>
+          <h2 className="text-base font-semibold text-gray-900">{t('print.ar.modal.title')}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
         <div className="px-6 py-4 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Period</label>
-            <input
-              type="month"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={month}
-              onChange={e => setMonth(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('print.ar.modal.from')}</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={fromDate}
+                onChange={e => setFromDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('print.ar.modal.to')}</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={toDate}
+                onChange={e => setToDate(e.target.value)}
+              />
+            </div>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-700 mb-2">Include Sections</p>
+            <p className="text-xs font-medium text-gray-700 mb-2">{t('print.ar.modal.sections')}</p>
             <div className="space-y-2">
               {([
-                { key: 'due',    label: 'Invoices due this month' },
-                { key: 'issued', label: 'Invoices issued this month' },
-                { key: 'paid',   label: 'Invoices paid this month' },
+                { key: 'due',    label: t('print.ar.modal.dueLabel') },
+                { key: 'issued', label: t('print.ar.modal.issuedLabel') },
+                { key: 'paid',   label: t('print.ar.modal.paidLabel') },
               ] as const).map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-3 cursor-pointer">
                   <input
@@ -651,7 +665,7 @@ function PrintConfigModal({ onClose }: { onClose: () => void }) {
             onClick={onClose}
             className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -659,7 +673,7 @@ function PrintConfigModal({ onClose }: { onClose: () => void }) {
             disabled={!canGenerate}
             className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            Generate Report
+            {t('print.ar.modal.generate')}
           </button>
         </div>
       </div>
@@ -881,7 +895,7 @@ export default function ReceivablesPage() {
             onClick={() => setShowPrintConfig(true)}
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-700 transition-colors"
           >
-            🖨 Print Report
+            {t('print.ar.modal.printBtn')}
           </button>
           <button
             onClick={() => setShowAddInvoice(true)}
