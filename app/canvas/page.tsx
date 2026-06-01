@@ -111,10 +111,11 @@ interface RunCardProps {
   onClose?: () => void
   onEdit?: () => void
   onEditQtys?: () => void
+  onPrint?: () => void
   onDelete?: () => void
 }
 
-function RunCard({ run, expanded, onToggle, onClose, onEdit, onEditQtys, onDelete }: RunCardProps) {
+function RunCard({ run, expanded, onToggle, onClose, onEdit, onEditQtys, onPrint, onDelete }: RunCardProps) {
   const { t } = useLanguage()
 
   return (
@@ -156,6 +157,14 @@ function RunCard({ run, expanded, onToggle, onClose, onEdit, onEditQtys, onDelet
                 className="px-2 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors border border-blue-200"
               >
                 Edit Qtys
+              </button>
+            )}
+            {onPrint && (
+              <button
+                onClick={onPrint}
+                className="px-2 py-1 text-xs font-medium bg-gray-50 text-gray-700 rounded hover:bg-gray-100 transition-colors border border-gray-200"
+              >
+                🖨 Print
               </button>
             )}
             {onEdit && (
@@ -1152,6 +1161,7 @@ export default function CanvasPage() {
                     onToggle={() => toggleRun(run.canvasId)}
                     onClose={() => setShowCloseRun(run)}
                     onEdit={() => setEditingRun(run)}
+                    onPrint={() => window.open(`/canvas/${encodeURIComponent(run.canvasId)}/print`, '_blank')}
                     onDelete={() => { setDeleteError(''); setDeletingRun(run) }}
                   />
                 ))}
