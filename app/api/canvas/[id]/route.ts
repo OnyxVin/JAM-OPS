@@ -4,6 +4,7 @@ import {
   closeCanvasRun,
   createCanvasItems,
   updateCanvasItemsSold,
+  createCanvasSales,
   updateCanvasRun,
   deleteCanvasRun,
   deleteCanvasItemsByRunId,
@@ -91,7 +92,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const canvasId = params.id
     const body = await request.json()
-    const { dateClosed, soldItems } = body
+    const { dateClosed, soldItems, salesBreakdown } = body
 
     if (!dateClosed || !Array.isArray(soldItems)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -112,6 +113,18 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         quantityReturned: item.quantityReturned != null ? String(item.quantityReturned) : undefined,
       }))
     )
+
+    if (Array.isArray(salesBreakdown) && salesBreakdown.length > 0) {
+      await createCanvasSales(
+        canvasId,
+        salesBreakdown.map((s: { itemName: string; customerCode: string; customerName: string; quantity: string }) => ({
+          itemName:     String(s.itemName),
+          customerCode: String(s.customerCode),
+          customerName: String(s.customerName),
+          quantity:     String(s.quantity),
+        }))
+      )
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

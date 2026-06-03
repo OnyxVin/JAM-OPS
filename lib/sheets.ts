@@ -1,16 +1,19 @@
 import { google } from 'googleapis'
 import { OAuth2Client } from 'google-auth-library'
-import type { InvoiceRow, PaymentRow, CanvasRunRow, CanvasItemRow } from './types'
+import type { InvoiceRow, PaymentRow, CanvasRunRow, CanvasItemRow, CustomerRow, CanvasSaleRow } from './types'
 
 const SHEET_ID_AR_INVOICES = process.env.GOOGLE_SHEET_ID_AR_INVOICES!
 const SHEET_ID_AR_PAYMENTS = process.env.GOOGLE_SHEET_ID_AR_PAYMENTS!
 const SHEET_ID_CANVAS_RUNS = process.env.GOOGLE_SHEET_ID_CANVAS_RUNS!
 const SHEET_ID_CANVAS_ITEMS = process.env.GOOGLE_SHEET_ID_CANVAS_ITEMS!
+const SHEET_ID_CANVAS_CUSTOMERS = process.env.GOOGLE_SHEET_ID_CANVAS_CUSTOMERS!
 
 const TAB_AR_INVOICES = process.env.GOOGLE_TAB_AR_INVOICES ?? 'Sheet1'
 const TAB_AR_PAYMENTS = process.env.GOOGLE_TAB_AR_PAYMENTS ?? 'Sheet1'
 const TAB_CANVAS_RUNS = process.env.GOOGLE_TAB_CANVAS_RUNS ?? 'Sheet1'
 const TAB_CANVAS_ITEMS = process.env.GOOGLE_TAB_CANVAS_ITEMS ?? 'Sheet1'
+const TAB_CUSTOMERS = process.env.GOOGLE_TAB_CUSTOMERS ?? 'Customers'
+const TAB_CANVAS_SALES = process.env.GOOGLE_TAB_CANVAS_SALES ?? 'Canvas Sales'
 
 // Singleton with dev-mode global to survive hot reload
 const globalForSheets = global as typeof global & { oauth2Client?: OAuth2Client }
@@ -423,6 +426,113 @@ export async function getNextCanvasId(dateOut: string): Promise<string> {
     }
   }
   return `${prefix}${String(maxSerial + 1).padStart(4, '0')}`
+}
+
+// ─── Customers ───────────────────────────────────────────────────────────────
+
+export async function getAllCustomers(): Promise<CustomerRow[]> {
+  const rows = await getSheetValues(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS)
+  if (rows.length < 1) return []
+  const colMap = buildColumnMap(rows[0])
+  return rows.slice(1).map((row, index) => ({
+    customerCode: row[colMap['customer_code']] ?? '',
+    customerName: row[colMap['customer_name']] ?? '',
+    address:      row[colMap['address']]       ?? '',
+    rowIndex:     index + 2,
+  })).filter(r => r.customerCode !== '')
+}
+
+export async function getNextCustomerCode(): Promise<string> {
+  const customers = await getAllCustomers()
+  let max = 0
+  for (const c of customers) {
+    if (c.customerCode.startsWith('CST')) {
+      const serial = parseInt(c.customerCode.slice(3)) || 0
+      if (serial > max) max = serial
+    }
+  }
+  return `CST${String(max + 1).padStart(4, '0')}`
+}
+
+export async function createCustomer(data: {
+  customerName: string
+  address: string
+}): Promise<string> {
+  const rows = await getSheetValues(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS)
+  if (rows.length < 1) throw new Error('Customers sheet has no header row')
+  const colMap = buildColumnMap(rows[0])
+  const customerCode = await getNextCustomerCode()
+  const maxCol = Math.max(...Object.values(colMap)) + 1
+  const row = new Array(maxCol).fill('')
+  row[colMap['customer_code']] = customerCode
+  row[colMap['customer_name']] = data.customerName
+  row[colMap['address']]       = data.address
+  await appendRow(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS, row)
+  return customerCode
+}
+
+export async function updateCustomer(
+  customerCode: string,
+  data: { customerName?: string; address?: string }
+): Promise<void> {
+  const rows = await getSheetValues(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS)
+  if (rows.length < 1) throw new Error('Customers sheet has no header row')
+  const colMap = buildColumnMap(rows[0])
+  const idx = rows.slice(1).findIndex(r => (r[colMap['customer_code']] ?? '') === customerCode)
+  if (idx === -1) throw new Error(`Customer ${customerCode} not found`)
+  const rowIndex = idx + 2
+  const existing = rows.slice(1)[idx]
+  const maxCol = Math.max(...Object.values(colMap)) + 1
+  const row = new Array(maxCol).fill('')
+  Object.values(colMap).forEach(i => { row[i] = existing[i] ?? '' })
+  row[colMap['customer_code']] = customerCode
+  if (data.customerName !== undefined) row[colMap['customer_name']] = data.customerName
+  if (data.address !== undefined)      row[colMap['address']]       = data.address
+  await updateRow(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS, rowIndex, row)
+}
+
+export async function deleteCustomer(customerCode: string): Promise<void> {
+  const rows = await getSheetValues(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS)
+  if (rows.length < 1) throw new Error('Customers sheet has no header row')
+  const colMap = buildColumnMap(rows[0])
+  const idx = rows.slice(1).findIndex(r => (r[colMap['customer_code']] ?? '') === customerCode)
+  if (idx === -1) throw new Error(`Customer ${customerCode} not found`)
+  await deleteSheetRow(SHEET_ID_CANVAS_CUSTOMERS, TAB_CUSTOMERS, idx + 2)
+}
+
+// ─── Canvas_Sales ─────────────────────────────────────────────────────────────
+
+export async function getAllCanvasSales(): Promise<CanvasSaleRow[]> {
+  const rows = await getSheetValues(SHEET_ID_CANVAS_CUSTOMERS, TAB_CANVAS_SALES)
+  if (rows.length < 1) return []
+  const colMap = buildColumnMap(rows[0])
+  return rows.slice(1).map(row => ({
+    canvasId:     row[colMap['canvas_id']]      ?? '',
+    itemName:     row[colMap['item_name']]      ?? '',
+    customerCode: row[colMap['customer_code']]  ?? '',
+    customerName: row[colMap['customer_name']]  ?? '',
+    quantity:     row[colMap['quantity']]        ?? '0',
+  })).filter(r => r.canvasId !== '')
+}
+
+export async function createCanvasSales(
+  canvasId: string,
+  sales: Array<{ itemName: string; customerCode: string; customerName: string; quantity: string }>
+): Promise<void> {
+  if (sales.length === 0) return
+  const rows = await getSheetValues(SHEET_ID_CANVAS_CUSTOMERS, TAB_CANVAS_SALES)
+  if (rows.length < 1) throw new Error('Canvas Sales sheet has no header row')
+  const colMap = buildColumnMap(rows[0])
+  const maxCol = Math.max(...Object.values(colMap)) + 1
+  for (const s of sales) {
+    const row = new Array(maxCol).fill('')
+    row[colMap['canvas_id']]      = canvasId
+    row[colMap['item_name']]      = s.itemName
+    row[colMap['customer_code']]  = s.customerCode
+    row[colMap['customer_name']]  = s.customerName
+    row[colMap['quantity']]        = s.quantity
+    await appendRow(SHEET_ID_CANVAS_CUSTOMERS, TAB_CANVAS_SALES, row)
+  }
 }
 
 export async function updateCanvasItemsSold(

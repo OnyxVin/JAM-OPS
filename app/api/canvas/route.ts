@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllCanvasRuns, getAllCanvasItems, createCanvasRun, createCanvasItems, getNextCanvasId } from '@/lib/sheets'
-import type { CanvasRun, CanvasItem, CanvasResponse } from '@/lib/types'
+import { getAllCanvasRuns, getAllCanvasItems, getAllCanvasSales, createCanvasRun, createCanvasItems, getNextCanvasId } from '@/lib/sheets'
+import type { CanvasRun, CanvasItem, CanvasSale, CanvasResponse } from '@/lib/types'
 
 export async function GET() {
   try {
-    const [runRows, itemRows] = await Promise.all([
+    const [runRows, itemRows, saleRows] = await Promise.all([
       getAllCanvasRuns(),
       getAllCanvasItems(),
+      getAllCanvasSales(),
     ])
 
+    // Group sales by canvasId for O(1) lookup
+    const salesByCanvas: Record<string, CanvasSale[]> = {}
+    for (const s of saleRows) {
+      if (!salesByCanvas[s.canvasId]) salesByCanvas[s.canvasId] = []
+      salesByCanvas[s.canvasId].push({ ...s, quantity: Number(s.quantity) || 0 })
+    }
+
     const runs: CanvasRun[] = runRows.map((run) => {
+      const canvasSales = salesByCanvas[run.canvasId] ?? []
+
       const matchingItems: CanvasItem[] = itemRows
         .filter((item) => item.canvasId === run.canvasId)
         .map((item) => {
@@ -22,6 +32,10 @@ export async function GET() {
             ? parseInt(item.quantityReturned) || 0
             : null
 
+          const customerSales = canvasSales
+            .filter(s => s.itemName === item.itemName)
+            .map(s => ({ customerCode: s.customerCode, customerName: s.customerName, quantity: s.quantity }))
+
           return {
             canvasId:         item.canvasId,
             itemCode:         item.itemCode,
@@ -31,6 +45,7 @@ export async function GET() {
             quantityBrought,
             quantitySold,
             quantityReturned,
+            customerSales,
           }
         })
 

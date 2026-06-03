@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useLanguage } from '@/lib/LanguageContext'
 import PrintPreviewModal from '@/components/PrintPreviewModal'
-import type { CanvasRun, CanvasItem, InventoryItem } from '@/lib/types'
+import type { CanvasRun, CanvasItem, InventoryItem, Customer } from '@/lib/types'
 
 const SALES_REPS = ['Tonny', 'Rudi']
 
@@ -657,6 +657,8 @@ function DeleteRunModal({ run, isDeleting, deleteError, onClose, onConfirm }: De
 
 // ─── Close Canvas Modal ───────────────────────────────────────────────────────
 
+type CustomerEntry = { customerCode: string; customerName: string; quantity: string }
+
 interface CloseRunModalProps {
   run: CanvasRun
   onClose: () => void
@@ -666,31 +668,90 @@ interface CloseRunModalProps {
 function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
   const { t } = useLanguage()
   const [dateClosed, setDateClosed] = useState(toInputDate(todayDDMMYYYY()))
-  const [soldQtys, setSoldQtys] = useState<Record<string, string>>(
-    Object.fromEntries(run.items.map((item) => [item.itemName, '']))
+  const [customerSales, setCustomerSales] = useState<Record<string, CustomerEntry[]>>(
+    Object.fromEntries(run.items.map((item) => [item.itemName, []]))
   )
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState('')
+  const [customers, setCustomers]           = useState<Customer[]>([])
+  const [loadingCustomers, setLoadingCustomers] = useState(true)
+  const [saving, setSaving]                 = useState(false)
+  const [saveError, setSaveError]           = useState('')
+
+  useEffect(() => {
+    fetch('/api/customers')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setCustomers(d.customers ?? []))
+      .catch(() => setCustomers([]))
+      .finally(() => setLoadingCustomers(false))
+  }, [])
+
+  function addCustomerRow(itemName: string) {
+    setCustomerSales(prev => ({
+      ...prev,
+      [itemName]: [...(prev[itemName] ?? []), { customerCode: '', customerName: '', quantity: '' }],
+    }))
+  }
+
+  function removeCustomerRow(itemName: string, idx: number) {
+    setCustomerSales(prev => ({
+      ...prev,
+      [itemName]: (prev[itemName] ?? []).filter((_, i) => i !== idx),
+    }))
+  }
+
+  function updateCustomerRow(itemName: string, idx: number, field: keyof CustomerEntry, value: string) {
+    setCustomerSales(prev => {
+      const rows = [...(prev[itemName] ?? [])]
+      if (field === 'customerCode') {
+        const found = customers.find(c => c.customerCode === value)
+        rows[idx] = { customerCode: value, customerName: found?.customerName ?? '', quantity: rows[idx].quantity }
+      } else {
+        rows[idx] = { ...rows[idx], [field]: value }
+      }
+      return { ...prev, [itemName]: rows }
+    })
+  }
+
+  function totalSoldForItem(itemName: string): number {
+    return (customerSales[itemName] ?? []).reduce((s, e) => s + (parseInt(e.quantity) || 0), 0)
+  }
+
+  function isValid(): boolean {
+    for (const item of run.items) {
+      const entries = customerSales[item.itemName] ?? []
+      if (totalSoldForItem(item.itemName) > item.quantityBrought) return false
+      for (const e of entries) {
+        if (!e.customerCode || !(parseInt(e.quantity) > 0)) return false
+      }
+    }
+    return true
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!dateClosed) return
+    if (!dateClosed || !isValid()) return
     setSaving(true)
     setSaveError('')
     try {
       const soldItems = run.items.map((item) => {
-        const sold = parseInt(soldQtys[item.itemName] || '0') || 0
-        const returned = item.quantityBrought - sold
+        const sold = totalSoldForItem(item.itemName)
         return {
           itemName:         item.itemName,
           quantitySold:     String(sold),
-          quantityReturned: String(returned >= 0 ? returned : 0),
+          quantityReturned: String(item.quantityBrought - sold),
         }
       })
+      const salesBreakdown = run.items.flatMap((item) =>
+        (customerSales[item.itemName] ?? []).map(e => ({
+          itemName:     item.itemName,
+          customerCode: e.customerCode,
+          customerName: e.customerName,
+          quantity:     e.quantity,
+        }))
+      )
       const res = await fetch(`/api/canvas/${encodeURIComponent(run.canvasId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dateClosed: fromInputDate(dateClosed), soldItems }),
+        body: JSON.stringify({ dateClosed: fromInputDate(dateClosed), soldItems, salesBreakdown }),
       })
       if (!res.ok) throw new Error()
       onSaved()
@@ -703,15 +764,15 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-base font-semibold">{t('canvas.modal.closeRun.title')}</h2>
             <p className="text-xs text-gray-500 mt-0.5 font-mono">{run.canvasId}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-4">
+        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-5">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">{t('canvas.modal.closeRun.dateClosed')}</label>
             <input
@@ -723,29 +784,77 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
           </div>
 
           <div>
-            <p className="text-xs font-medium text-gray-700 mb-2">{t('canvas.modal.closeRun.items')}</p>
-            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center mb-1">
-              <span />
-              <span className="text-xs text-gray-400 text-center whitespace-nowrap">{t('canvas.item.brought')}</span>
-              <span className="text-xs text-blue-600 text-center whitespace-nowrap">{t('canvas.item.sold')}</span>
-            </div>
-            <div className="space-y-2">
-              {run.items.map((item) => (
-                <div key={item.itemName} className="grid grid-cols-[1fr_auto_auto] gap-x-3 items-center">
-                  <span className="text-sm text-gray-700 truncate">{item.itemName}</span>
-                  <span className="text-xs text-gray-500 text-center w-8">{item.quantityBrought}</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max={item.quantityBrought}
-                    className="w-20 px-2 py-1.5 border border-gray-300 rounded-lg text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="0"
-                    value={soldQtys[item.itemName] ?? ''}
-                    onChange={(e) => setSoldQtys({ ...soldQtys, [item.itemName]: e.target.value })}
-                  />
-                </div>
-              ))}
-            </div>
+            <p className="text-xs font-medium text-gray-700 mb-3">{t('canvas.modal.closeRun.customers')}</p>
+            {loadingCustomers ? (
+              <p className="text-xs text-gray-400 italic">{t('canvas.modal.closeRun.loadingCust')}</p>
+            ) : customers.length === 0 ? (
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {t('canvas.modal.closeRun.noCustomers')}
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {run.items.map((item) => {
+                  const entries = customerSales[item.itemName] ?? []
+                  const totalSold = totalSoldForItem(item.itemName)
+                  const overQty = totalSold > item.quantityBrought
+                  return (
+                    <div key={item.itemName} className="border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-800 truncate">{item.itemName}</span>
+                        <span className="text-xs text-gray-500 ml-2 whitespace-nowrap">{t('canvas.item.brought')}: {item.quantityBrought}</span>
+                      </div>
+                      {entries.length > 0 && (
+                        <div className="space-y-1.5 mb-2">
+                          {entries.map((entry, idx) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <select
+                                value={entry.customerCode}
+                                onChange={e => updateCustomerRow(item.itemName, idx, 'customerCode', e.target.value)}
+                                className="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              >
+                                <option value="">{t('canvas.modal.closeRun.selectCust')}</option>
+                                {customers.map(c => (
+                                  <option key={c.customerCode} value={c.customerCode}>{c.customerName}</option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                min="1"
+                                max={item.quantityBrought}
+                                value={entry.quantity}
+                                onChange={e => updateCustomerRow(item.itemName, idx, 'quantity', e.target.value)}
+                                placeholder="0"
+                                className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeCustomerRow(item.itemName, idx)}
+                                className="text-gray-400 hover:text-red-500 transition-colors text-base leading-none px-1"
+                              >×</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between mt-1">
+                        <button
+                          type="button"
+                          onClick={() => addCustomerRow(item.itemName)}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                        >
+                          {t('canvas.modal.closeRun.addCustomer')}
+                        </button>
+                        <span className={`text-xs ${overQty ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                          {overQty
+                            ? t('canvas.modal.closeRun.overQty')
+                            : `${t('canvas.modal.closeRun.totalSold')} ${totalSold} / ${item.quantityBrought} → ${item.quantityBrought - totalSold} ${t('canvas.modal.closeRun.returned')}`
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}
@@ -755,7 +864,7 @@ function CloseRunModal({ run, onClose, onSaved }: CloseRunModalProps) {
             </button>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || !isValid() || loadingCustomers}
               className="px-4 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? t('common.saving') : t('canvas.closeRun')}
@@ -867,6 +976,76 @@ function EditQuantitiesModal({ run, onClose, onSaved }: EditQuantitiesModalProps
   )
 }
 
+// ─── Canvas Print Config Modal ────────────────────────────────────────────────
+
+interface CanvasPrintConfigModalProps {
+  onClose: () => void
+  onGenerate: (url: string) => void
+}
+
+function CanvasPrintConfigModal({ onClose, onGenerate }: CanvasPrintConfigModalProps) {
+  const { t } = useLanguage()
+  const now = new Date()
+  const defaultFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const defaultTo   = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const [fromDate, setFromDate] = useState(defaultFrom)
+  const [toDate, setToDate]     = useState(defaultTo)
+  const [sections, setSections] = useState({ runs: true, items: true, customers: true })
+
+  function generate() {
+    const s = Object.entries(sections).filter(([, v]) => v).map(([k]) => k).join(',')
+    if (!s) return
+    onGenerate(`/canvas/print?from=${fromDate}&to=${toDate}&sections=${s}&preview=1`)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-5">{t('print.canvas.modal.title')}</h2>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('print.canvas.modal.from')}</label>
+              <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">{t('print.canvas.modal.to')}</label>
+              <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-700 mb-2">{t('print.canvas.modal.sections')}</p>
+            {(['runs', 'items', 'customers'] as const).map(key => (
+              <label key={key} className="flex items-center gap-2 py-1 cursor-pointer">
+                <input type="checkbox" checked={sections[key]} onChange={e => setSections({ ...sections, [key]: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600" />
+                <span className="text-sm text-gray-700">
+                  {key === 'runs' ? t('print.canvas.modal.runsLabel') : key === 'items' ? t('print.canvas.modal.itemsLabel') : t('print.canvas.modal.custLabel')}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={generate}
+              disabled={!Object.values(sections).some(Boolean)}
+              className="flex-1 py-2 text-sm font-medium bg-blue-700 text-white rounded-lg hover:bg-blue-800 disabled:opacity-50 transition-colors"
+            >
+              {t('print.canvas.modal.generate')}
+            </button>
+            <button onClick={onClose}
+              className="flex-1 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CanvasPage() {
@@ -886,7 +1065,8 @@ export default function CanvasPage() {
   const [deletingRun, setDeletingRun] = useState<CanvasRun | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
-  const [printPreviewUrl, setPrintPreviewUrl] = useState<string | null>(null)
+  const [printPreviewUrl, setPrintPreviewUrl]   = useState<string | null>(null)
+  const [showPrintConfig, setShowPrintConfig]   = useState(false)
 
   // ─── Search & filter state ────────────────────────────────────────────────
   const [searchScope, setSearchScope] = useState<'all' | 'id' | 'rep'>('all')
@@ -1010,6 +1190,12 @@ export default function CanvasPage() {
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg text-gray-600 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50 transition-colors"
           >
             {syncing ? t('common.syncing') : t('common.sync')}
+          </button>
+          <button
+            onClick={() => setShowPrintConfig(true)}
+            className="px-3 py-1.5 text-sm font-medium text-blue-700 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            {t('print.canvas.modal.printBtn')}
           </button>
           <button
             onClick={() => setShowNewRun(true)}
@@ -1244,10 +1430,16 @@ export default function CanvasPage() {
           onConfirm={handleDeleteConfirm}
         />
       )}
+      {showPrintConfig && (
+        <CanvasPrintConfigModal
+          onClose={() => setShowPrintConfig(false)}
+          onGenerate={(url) => { setShowPrintConfig(false); setPrintPreviewUrl(url) }}
+        />
+      )}
       {printPreviewUrl && (
         <PrintPreviewModal
           url={printPreviewUrl}
-          title={t('print.canvas.title')}
+          title={t('print.canvas.report.title')}
           onClose={() => setPrintPreviewUrl(null)}
         />
       )}

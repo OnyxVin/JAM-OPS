@@ -62,6 +62,37 @@ export interface CanvasItem {
   quantityBrought: number
   quantitySold: number | null
   quantityReturned: number | null
+  customerSales: Array<{ customerCode: string; customerName: string; quantity: number }>
+}
+
+export interface CustomerRow {
+  customerCode: string
+  customerName: string
+  address: string
+  rowIndex: number
+}
+
+export interface Customer {
+  customerCode: string
+  customerName: string
+  address: string
+  rowIndex: number
+}
+
+export interface CanvasSaleRow {
+  canvasId: string
+  itemName: string
+  customerCode: string
+  customerName: string
+  quantity: string
+}
+
+export interface CanvasSale {
+  canvasId: string
+  itemName: string
+  customerCode: string
+  customerName: string
+  quantity: number
 }
 
 export interface CanvasRun extends CanvasRunRow {

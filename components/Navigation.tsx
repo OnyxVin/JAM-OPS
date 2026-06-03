@@ -15,6 +15,7 @@ export default function Navigation() {
     { href: '/receivables', label: t('nav.receivables') },
     { href: '/canvas', label: t('nav.canvas') },
     { href: '/inventory', label: t('nav.inventory') },
+    { href: '/customers', label: t('nav.customers') },
   ]
 
   async function handleLogout() {
